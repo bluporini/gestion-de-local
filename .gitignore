@@ -1,0 +1,22 @@
+## Basura
+__pycache__/
+*.pyc
+.env
+.env.local
+.DS_Store
+installer/linux/build
+.pytest_cache/
+
+## Archivos locales
+stock_local.db
+.token
+updater_config.json
+update_status.json
+supabase.env
+estado_backup.json
+
+## Carpetas locales
+backend/venv/
+.venv/
+venv/
+.vscode/

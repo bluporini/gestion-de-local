@@ -1,0 +1,13 @@
+# Demo web en Render (plan gratuito). Ver "Demo online" en el README.
+services:
+  - type: web
+    name: gestiondelocal-bluporini
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements-web.txt
+    # Un solo worker: SQLite y la generación de la base de ejemplo al arrancar.
+    startCommand: gunicorn --chdir backend demo:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9

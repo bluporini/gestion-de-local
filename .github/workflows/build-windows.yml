@@ -1,0 +1,254 @@
+name: Build Windows Installer
+
+# Se dispara manualmente desde la pestaña "Actions" de GitHub
+# o automáticamente al crear un tag de versión (v1.0.0, v1.1.0, etc.)
+# En esta versión de portfolio solo se dispara a mano: publicar releases
+# requiere los secrets del proyecto real (RELEASES_REPO_TOKEN, etc.).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v7
+
+      - name: Configurar Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          # tkinter (usado por launcher.py) viene incluido en esta
+          # instalación estándar de Python en Windows, no requiere
+          # ningún paso extra de instalación.
+
+      - name: Instalar dependencias del backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # Si algún test falla, el build se corta acá y no se publica nada.
+      - name: Correr tests
+        run: python -m pytest -q
+
+      # NOTA: a partir de que se agregó la ventana gráfica del launcher,
+      # el punto de entrada del ejecutable final pasó de
+      # `backend/wsgi.py` (consola + navegador automático, pensado para
+      # desarrollo) a `launcher.py` en la raíz del repo (ventana con
+      # botones, para el cliente final). wsgi.py se sigue usando para
+      # correr la app en local durante desarrollo, pero ya NO es lo que
+      # se compila acá.
+      #
+      # Por eso este paso se compila desde la raíz del checkout (sin
+      # `working-directory: backend`), y la ruta de --add-data cambia de
+      # "../frontend;frontend" a "frontend;frontend".
+      #
+      # Si en el futuro se vuelve a mover el punto de entrada de lugar,
+      # acordarse de:
+      #   1. Actualizar el target de este comando (launcher.py -> lo que sea).
+      #   2. Revisar la ruta relativa de --add-data.
+      #   3. Actualizar las rutas de dist\GestionDeLocal.exe en los pasos
+      #      "Probar GestionDeLocal.exe" y "Copiar ejecutables..." de más abajo,
+      #      porque dependen de desde dónde se corrió pyinstaller.
+      # --paths backend: launcher.py hace `from app.main import create_app`,
+      # y `app` vive en backend/app. PyInstaller analiza los imports desde
+      # donde se corre este comando (raíz del checkout), no desde el
+      # sys.path que arma launcher.py en tiempo de ejecución, así que sin
+      # este flag no empaqueta el paquete `app` y el .exe final falla con
+      # "ModuleNotFoundError: No module named 'app'".
+      # Credenciales de Supabase para los respaldos. Van EMBEBIDAS en el
+      # exe (--add-data) y no como .env suelto en el instalador: el
+      # updater solo reemplaza el .exe, así que un .env del instalador no
+      # le llegaría nunca a una instalación que se actualiza sola.
+      # SUPABASE_KEY tiene que ser la clave anon, y el bucket "backups"
+      # tiene que permitirle SOLO subir (ver docs/respaldos.md).
+      - name: Generar supabase.env
+        shell: pwsh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if (-not $env:SUPABASE_URL -or -not $env:SUPABASE_KEY) {
+            Write-Error "Faltan los secrets SUPABASE_URL o SUPABASE_KEY."
+            exit 1
+          }
+          [System.IO.File]::WriteAllText(
+            "$PWD\supabase.env",
+            "SUPABASE_URL=$env:SUPABASE_URL`nSUPABASE_KEY=$env:SUPABASE_KEY`n")
+
+      - name: Compilar GestionDeLocal.exe
+        run: |
+          pyinstaller `
+            --onefile `
+            --windowed `
+            --name GestionDeLocal `
+            --paths backend `
+            --add-data "frontend;frontend" `
+            --add-data "schema.sql;." `
+            --add-data "supabase.env;." `
+            launcher.py
+
+      - name: Probar GestionDeLocal.exe
+        shell: pwsh
+        run: |
+          $stdout = "app_stdout.txt"
+          $stderr = "app_stderr.txt"
+
+          # Ruta actualizada: ya no es "backend\dist\...", porque ahora
+          # se compila desde la raíz (ver comentario en el paso de
+          # compilación de más arriba).
+          $process = Start-Process `
+            -FilePath "dist\GestionDeLocal.exe" `
+            -PassThru `
+            -RedirectStandardOutput $stdout `
+            -RedirectStandardError $stderr
+
+          Start-Sleep -Seconds 10
+
+          Write-Host "===== ESTADO DEL PROCESO ====="
+
+          if ($process.HasExited) {
+            Write-Host "El proceso terminó."
+            Write-Host "ExitCode: $($process.ExitCode)"
+          }
+          else {
+            Write-Host "El proceso sigue ejecutándose."
+          }
+
+          Write-Host ""
+          Write-Host "===== STDOUT ====="
+
+          if (Test-Path $stdout) {
+            Get-Content $stdout
+          }
+          else {
+            Write-Host "No existe archivo STDOUT."
+          }
+
+          Write-Host ""
+          Write-Host "===== STDERR ====="
+
+          if (Test-Path $stderr) {
+            Get-Content $stderr
+          }
+          else {
+            Write-Host "No existe archivo STDERR."
+          }
+
+          Write-Host ""
+          Write-Host "===== PUERTO 5000 ====="
+          # El servidor Flask arranca en un hilo de fondo apenas se
+          # ejecuta el .exe, antes de que se dibuje la ventana de
+          # tkinter, así que este chequeo sigue siendo válido con
+          # --windowed (no hace falta que la ventana esté visible
+          # ni que se apriete ningún botón).
+
+          try {
+            $response = Invoke-WebRequest `
+              -Uri "http://127.0.0.1:5000" `
+              -UseBasicParsing `
+              -TimeoutSec 5
+
+            Write-Host "HTTP Status: $($response.StatusCode)"
+            Write-Host "✓ GestionDeLocal.exe respondió correctamente."
+          }
+          catch {
+            Write-Host "No respondió en el puerto 5000:"
+            Write-Host $_
+          }
+
+          if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force
+          }
+
+      - name: Compilar updater.exe
+        run: |
+          pyinstaller --onefile --name updater installer/updater/updater.py
+
+      - name: Copiar ejecutables a la carpeta que espera el instalador
+        run: |
+          mkdir installer\dist
+          copy dist\GestionDeLocal.exe installer\dist\GestionDeLocal.exe
+          copy dist\updater.exe installer\dist\updater.exe
+
+      # updater.exe necesita un token para descargar del repo PRIVADO de
+      # releases. RELEASES_READ_TOKEN: fine-grained PAT con "Contents:
+      # read-only" SOLO sobre el repo de releases (nunca sobre este repo de
+      # código). Va en un updater_config.json que el instalador copia junto
+      # a updater.exe, con el owner/nombre del repo de releases (variable de
+      # repositorio RELEASES_REPO, "owner/repo"). Se escribe sin BOM porque
+      # json.load de Python no lo acepta.
+      - name: Generar updater_config.json con el token de lectura
+        shell: pwsh
+        env:
+          RELEASES_READ_TOKEN: ${{ secrets.RELEASES_READ_TOKEN }}
+          RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+        run: |
+          if (-not $env:RELEASES_READ_TOKEN) {
+            Write-Error "Falta el secret RELEASES_READ_TOKEN."
+            exit 1
+          }
+          if ($env:RELEASES_REPO -notmatch '^[^/]+/[^/]+$') {
+            Write-Error "Falta la variable RELEASES_REPO (formato owner/repo)."
+            exit 1
+          }
+          $owner, $name = $env:RELEASES_REPO.Split('/')
+          $config = @{
+            github_token = $env:RELEASES_READ_TOKEN
+            repo_owner   = $owner
+            repo_name    = $name
+          } | ConvertTo-Json
+          [System.IO.File]::WriteAllText(
+            "$PWD\installer\dist\updater_config.json", $config)
+
+      - name: Instalar Inno Setup
+        run: choco install innosetup -y
+
+      - name: Inyectar la versión de version.json en el instalador
+        shell: pwsh
+        run: |
+          # Mantiene MyAppVersion sincronizado con version.json sin
+          # tener que tocarlo a mano en cada release.
+          # -Encoding UTF8 explícito en ambos extremos evita que el
+          # archivo termine con una codificación distinta a la
+          # original y rompa el preprocesador de Inno Setup.
+          $version = (Get-Content version.json -Encoding UTF8 | ConvertFrom-Json).version
+          (Get-Content installer\installer.iss -Encoding UTF8) `
+            -replace '__APP_VERSION_PLACEHOLDER__', $version `
+            | Set-Content installer\installer.iss -Encoding UTF8
+
+      - name: Compilar el instalador
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\installer.iss
+
+      - name: Subir el instalador como artefacto
+        uses: actions/upload-artifact@v7
+        with:
+          name: GestionDeLocal-Setup
+          path: installer/dist_installer/*.exe
+
+      # Los releases se publican en un repo privado aparte que solo tiene
+      # binarios: así el token de lectura que va en el instalador no da
+      # acceso a este repo de código.
+      # RELEASES_REPO_TOKEN: fine-grained PAT con "Contents: read and
+      # write" solo sobre el repo de releases (variable RELEASES_REPO).
+      #
+      # Se adjuntan dos .exe:
+      #   - GestionDeLocal.exe: lo descarga updater.exe para actualizar
+      #     instalaciones existentes (busca ese nombre exacto).
+      #   - El instalador: para instalaciones nuevas.
+      - name: Publicar release en el repo de releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3
+        with:
+          repository: ${{ vars.RELEASES_REPO }}
+          token: ${{ secrets.RELEASES_REPO_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/GestionDeLocal.exe
+            installer/dist_installer/*.exe

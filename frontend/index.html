@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <link rel="icon" href="/favicon.ico">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Local</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <div id="demo-banner"></div>
+  <div id="update-banner"></div>
+
+  <div id="app" class="app-layout">
+
+    <aside class="sidebar">
+      <img src="logo.png" alt="Gestión de Local" class="logo">
+      <nav>
+        <button data-tab="dashboard" class="active">📄 Dashboard</button>
+        <button data-tab="ventas">💲 Ventas</button>
+        <button data-tab="cambios">🔄 Cambios</button>
+        <button data-tab="productos">👕 Productos</button>
+        <button data-tab="configuracion">⚙️ Configuración</button>
+      </nav>
+    </aside>
+
+    <div class="content-area">
+    <main>
+
+      <!-- ===================== DASHBOARD ===================== -->
+      <section id="dashboard" class="active">
+        <div class="toolbar">
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <button class="btn" onclick="abrirModalCambio()">+ Registrar cambio</button>
+            <button class="btn" onclick="abrirModalVenta()">+ Agregar venta</button>
+            <button class="btn" onclick="abrirResumenCaja()">Resumen de caja</button>
+          </div>
+        </div>
+
+        <div class="cards">
+          <div class="card">
+            <div class="label">Ventas hoy</div>
+            <div class="value" id="statVentasHoy">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ventas semana</div>
+            <div class="value" id="statVentasSemana">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ventas mes</div>
+            <div class="value" id="statVentasMes">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ingresos hoy</div>
+            <div class="value green" id="statIngresosHoy">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ingresos semana</div>
+            <div class="value green" id="statIngresosSemana">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ingresos mes</div>
+            <div class="value green" id="statIngresosMes">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ganancia neta semana</div>
+            <div class="value green" id="statGananciaSemana">—</div>
+          </div>
+          <div class="card">
+            <div class="label">Ganancia neta mes</div>
+            <div class="value green" id="statGananciaMes">—</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="toolbar">
+            <h3 style="margin:0">Historial de ventas del día</h3>
+            <input type="date" id="fechaHistorial" />
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Productos</th>
+                <th>Método</th>
+                <th>Total</th>
+                <th>Ganancia</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tablaHistorialDia">
+              <tr>
+                <td colspan="7" class="empty">Error: Empty</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel" id="panelStockBajo" style="display:none;">
+          <h3>⚠️ Stock bajo</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Código</th>
+                <th>Talle/Color</th>
+                <th>Stock</th>
+              </tr>
+            </thead>
+            <tbody id="tablaStockBajo">
+              <tr>
+                <td colspan="4" class="empty">Sin datos aún</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+
+      <!-- ===================== PRODUCTOS ===================== -->
+      <section id="productos">
+        <div class="toolbar">
+          <h3 style="margin:0">Productos en stock</h3>
+
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <input id="buscadorProductosLista" placeholder="Buscar por nombre o código..." style="min-width:220px"
+              autocomplete="off" />
+
+            <button class="btn" onclick="abrirModalProducto()">
+              + Agregar producto
+            </button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Cantidad actual</th>
+                <th>Variantes</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody id="tablaProductos">
+              <tr>
+                <td colspan="6" class="empty">
+                  No hay datos
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="paginacion" id="paginacionProductos"></div>
+        </div>
+
+        <div class="toolbar">
+          <button type="button" class="btn secondary" id="btnToggleSinStock" onclick="toggleProductosSinStock()">
+            ▼ Ver productos sin stock
+          </button>
+        </div>
+
+        <div class="panel" id="panelSinStock">
+          <div class="toolbar">
+            <h3 style="margin:0">Productos sin stock</h3>
+
+            <input id="buscadorProductosSinStock" placeholder="Buscar por nombre o código..." style="min-width:220px"
+              autocomplete="off" />
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Variantes</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody id="tablaProductosSinStock">
+              <tr>
+                <td colspan="5" class="empty">
+                  Cargando...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="paginacion" id="paginacionProductosSinStock"></div>
+        </div>
+      </section>
+
+      <!-- ===================== VENTAS ===================== -->
+      <section id="ventas">
+        <div class="toolbar">
+          <h3 style="margin:0">Historial de ventas</h3>
+          <div style="display:flex; gap:8px; align-items:center">
+            <input type="date" id="fechaVentas" />
+            <button class="btn secondary small" onclick="limpiarFiltroFechaVentas()">Ver todas</button>
+            <button class="btn" onclick="abrirModalVenta()">+ Agregar venta</button>
+          </div>
+        </div>
+        <div class="panel">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Productos</th>
+                <th>Método</th>
+                <th>Total</th>
+                <th>Ganancia</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tablaVentas">
+              <tr>
+                <td colspan="8" class="empty">No hay datos</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="paginacion" id="paginacionVentas"></div>
+        </div>
+      </section>
+
+      <!-- ===================== CAMBIOS ===================== -->
+      <section id="cambios">
+        <div class="toolbar">
+          <h3 style="margin:0">Cambios</h3>
+          <div style="display:flex; gap:8px; align-items:center">
+            <input type="date" id="fechaCambios" />
+            <button class="btn secondary small" onclick="limpiarFiltroFechaCambios()">Ver todos</button>
+            <button class="btn" onclick="abrirModalCambio()">+ Registrar cambio</button>
+          </div>
+        </div>
+        <div class="panel">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Código</th>
+                <th>Venta</th>
+                <th>Devuelto</th>
+                <th>Nuevo</th>
+                <th>Ganancia</th>
+                <th>Ingreso</th>
+                <th>Método</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tablaCambios">
+              <tr>
+                <td colspan="9" class="empty">No hay datos</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="paginacion" id="paginacionCambios"></div>
+        </div>
+      </section>
+
+      <!-- ===================== CONFIGURACIÓN ===================== -->
+      <section id="configuracion">
+        <div class="config-grid">
+
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <div class="panel config-section">
+              <h3>Tipos de prenda
+                <span class="help-icon"
+                  data-help="Definen el prefijo del código automático de cada variante (ej: Remera → RE-0001). Se usan al cargar productos nuevos.">?</span>
+              </h3>
+              <div id="listaTipos" class="tipos-list"></div>
+              <form id="formTipo" class="tipo-form">
+                <input name="nombre" id="tipoNombre" placeholder="Nombre (ej: Campera)" required />
+                <input name="prefijo" id="tipoPrefijo" placeholder="Prefijo (ej: CA)" maxlength="4" required />
+                <button type="submit" class="btn small">+ Agregar</button>
+              </form>
+              <div class="msg" id="msgTipo"></div>
+            </div>
+          </div>
+
+          <div class="panel config-section">
+            <h3>Respaldo de la base de datos
+              <span class="help-icon"
+                data-help="Sube una copia de seguridad de la base de datos local a la cuenta del administrador.">?</span>
+            </h3>
+            <p style="font-size:.82rem; color:var(--muted); margin-top:0; margin-bottom:12px;">
+              Guardar de forma segura tus datos en la nube.
+            </p>
+            <button type="button" class="btn secondary" id="btnBackupDrive" onclick="subirBackupSupabase()">
+              ☁️ Guardar respaldo
+            </button>
+
+            <div class="msg" id="msgBackupDrive"></div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+    </div>
+    <!-- fin .content-area -->
+
+    <!-- ===================== MODAL: PRODUCTO ===================== -->
+    <div class="modal-backdrop" id="modalProducto">
+      <div class="modal modal-ancho">
+        <h3 id="tituloModalProducto">Nuevo producto</h3>
+        <form id="formProducto">
+          <input type="hidden" name="producto_id" id="productoIdEdit" />
+          <div class="form-grid">
+            <div>
+              <label>Nombre</label>
+              <input name="nombre" required placeholder="Remera básica" />
+            </div>
+            <div>
+              <label>Tipo de prenda</label>
+              <select name="tipo_id" id="selectTipo"></select>
+            </div>
+          </div>
+
+          <label style="font-size:.85rem;color:var(--muted); font-weight:600; display:block; margin-top:6px">
+            Variantes
+          </label>
+          <p style="font-size:.78rem;color:var(--muted); margin:2px 0 8px">
+            Cada variante (talle/color) tiene su propio costo, % de ganancia, precio y stock.
+          </p>
+          <div class="variantes-list" id="variantesList"></div>
+          <button type="button" class="btn secondary small" onclick="agregarFilaVariante()">+ Agregar variante</button>
+
+          <div class="modal-actions">
+            <button type="button" class="btn secondary" onclick="cerrarModal('modalProducto')">Cancelar</button>
+            <button type="submit" class="btn" id="btnGuardarProducto">Guardar producto</button>
+          </div>
+          <div class="msg" id="msgProducto"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: VENTA ===================== -->
+    <div class="modal-backdrop" id="modalVenta">
+      <div class="modal">
+        <h3>Nueva venta</h3>
+
+        <label style="font-size:.78rem;color:var(--muted)">Cliente</label>
+        <input id="inputCliente" placeholder="Nombre del cliente (opcional)" style="width:100%; margin-bottom:12px" />
+
+        <label style="font-size:.78rem;color:var(--muted)">Buscar producto</label>
+        <div class="buscador-wrap">
+          <input id="buscadorProducto" placeholder="Escribí el nombre, código, talle o color..." autocomplete="off" />
+          <div class="buscador-resultados" id="buscadorResultados"></div>
+        </div>
+        <input type="hidden" id="varianteSeleccionada" />
+
+        <div class="form-grid" style="margin-top:10px">
+          <div>
+            <label>Cantidad</label>
+            <input id="inputCantidad" type="number" min="1" value="1" />
+          </div>
+          <div style="display:flex; align-items:flex-end">
+            <button type="button" class="btn secondary small" onclick="agregarAlCarrito()">+ Agregar al carrito</button>
+          </div>
+        </div>
+
+        <div id="carrito" style="margin:14px 0"></div>
+
+        <div class="form-grid">
+          <div>
+            <label>Método de pago</label>
+            <select id="selectMetodoPago" onchange="onCambioMetodoPago()">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta_debito">Tarjeta débito</option>
+              <option value="tarjeta_credito">Tarjeta crédito</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label>Total</label>
+            <input id="totalCarrito" disabled value="$0" />
+          </div>
+        </div>
+
+        <div class="pago-extra" id="pagoEfectivo" style="display:none">
+          <label style="font-size:.78rem;color:var(--muted)">Monto con el que paga el cliente</label>
+          <input id="inputMontoPagado" type="text" inputmode="numeric" class="input-monto" placeholder="0"
+            style="width:100%" />
+          <div class="vuelto" id="vueltoTexto">Vuelto: $0</div>
+        </div>
+
+        <div class="pago-extra" id="pagoTarjeta" style="display:none">
+          <label style="font-size:.78rem;color:var(--muted)">Tipo de tarjeta</label>
+          <select id="selectTipoTarjeta" style="width:100%">
+            <option value="Visa">Visa</option>
+            <option value="Mastercard">Mastercard</option>
+            <option value="American Express">American Express</option>
+            <option value="Cabal">Cabal</option>
+            <option value="Otra">Otra</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" onclick="cerrarModal('modalVenta')">Cancelar</button>
+          <button type="button" class="btn" onclick="confirmarVenta()">Confirmar venta</button>
+        </div>
+        <div class="msg" id="msgVenta"></div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: EDITAR VENTA ===================== -->
+    <div class="modal-backdrop" id="modalEditarVenta">
+      <div class="modal" style="width:420px">
+        <h3>Editar venta</h3>
+        <input type="hidden" id="ventaIdEdit" />
+        <label style="font-size:.78rem;color:var(--muted)">Cliente</label>
+        <input id="editCliente" style="width:100%; margin-bottom:12px" />
+        <label style="font-size:.78rem;color:var(--muted)">Método de pago</label>
+        <select id="editMetodoPago" style="width:100%">
+          <option value="efectivo">Efectivo</option>
+          <option value="tarjeta_debito">Tarjeta débito</option>
+          <option value="tarjeta_credito">Tarjeta crédito</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="otro">Otro</option>
+        </select>
+        <p style="font-size:.78rem; color:var(--muted); margin-top:10px">Para cambiar productos o cantidades, borrá la
+          venta y cargala de nuevo.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" onclick="cerrarModal('modalEditarVenta')">Cancelar</button>
+          <button type="button" class="btn" onclick="guardarEdicionVenta()">Guardar cambios</button>
+        </div>
+        <div class="msg" id="msgEditarVenta"></div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: RESUMEN DE CAJA ===================== -->
+    <div class="modal-backdrop" id="modalResumenCaja">
+      <div class="modal" style="width:860px">
+        <h3>Resumen de caja</h3>
+        <textarea id="textoResumenCaja" class="resumen-caja-texto" readonly rows="18"></textarea>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" onclick="copiarResumenCaja()">📋 Copiar</button>
+          <button type="button" class="btn secondary" onclick="exportarResumenCajaPDF()">📄 Exportar a PDF</button>
+          <button type="button" class="btn" onclick="cerrarModal('modalResumenCaja')">Listo</button>
+        </div>
+        <div class="msg" id="msgResumenCaja"></div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: CAMBIO ===================== -->
+    <div class="modal-backdrop" id="modalCambio">
+      <div class="modal modal-ancho">
+        <h3 id="tituloModalCambio">Registrar cambio</h3>
+
+        <!-- Paso 1: elegir la venta -->
+        <div id="pasoBuscarVentaCambio">
+          <label style="font-size:.78rem;color:var(--muted)">Buscar venta por código o cliente</label>
+          <div class="buscador-wrap">
+            <input id="buscadorVentaCambio" placeholder="Código de venta o nombre del cliente..." autocomplete="off" />
+            <div class="buscador-resultados" id="buscadorResultadosVentaCambio"></div>
+          </div>
+        </div>
+
+        <!-- Paso 2: venta seleccionada -->
+        <div id="detalleCambio" style="display:none">
+          <div class="pago-extra" style="margin-top:10px">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <div>
+                <strong id="ventaCambioCodigo"></strong>
+                <span id="ventaCambioCliente" style="color:var(--muted); font-size:.85rem"></span>
+              </div>
+              <button type="button" class="btn secondary small" onclick="cambiarVentaSeleccionada()">↺ Cambiar
+                venta</button>
+            </div>
+          </div>
+
+          <label style="font-size:.85rem;color:var(--muted); font-weight:600; display:block; margin-top:14px">
+            Productos que devuelve el cliente
+          </label>
+          <div id="itemsDevolverCambio" class="variantes-list"></div>
+
+          <label style="font-size:.85rem;color:var(--muted); font-weight:600; display:block; margin-top:14px">
+            Productos nuevos que se lleva
+          </label>
+          <div class="buscador-wrap">
+            <input id="buscadorProductoNuevoCambio" placeholder="Escribí el nombre, código, talle o color..."
+              autocomplete="off" />
+            <div class="buscador-resultados" id="buscadorResultadosNuevoCambio"></div>
+          </div>
+          <div class="form-grid" style="margin-top:8px; grid-template-columns: 1fr auto">
+            <input id="inputCantidadNuevoCambio" type="number" min="1" value="1" />
+            <button type="button" class="btn secondary small" onclick="agregarProductoNuevoCambio()">+ Agregar</button>
+          </div>
+          <input type="hidden" id="varianteNuevaSeleccionadaCambio" />
+          <div id="listaNuevosCambio" style="margin:10px 0"></div>
+
+          <div class="pago-extra" style="margin-top:14px">
+            <div style="display:flex; justify-content:space-between; font-size:.85rem">
+              <span>Total devuelto</span><span id="totalDevueltoCambio">$0</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:.85rem; margin-top:4px">
+              <span>Total nuevo</span><span id="totalNuevoCambio">$0</span>
+            </div>
+            <div
+              style="display:flex; justify-content:space-between; font-weight:700; margin-top:8px; border-top:1px solid var(--border); padding-top:8px">
+              <span id="etiquetaDiferenciaCambio">Diferencia</span><span id="montoDiferenciaTexto">$0</span>
+            </div>
+          </div>
+
+          <div id="pagoDiferenciaCambio" class="form-grid" style="margin-top:10px; display:none">
+            <div>
+              <label>Monto <span id="labelTipoMontoCambio"></span></label>
+              <input id="inputMontoDiferenciaCambio" type="text" inputmode="numeric" class="input-monto" />
+            </div>
+            <div>
+              <label>Método de pago</label>
+              <select id="selectMetodoPagoCambio">
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta_debito">Tarjeta débito</option>
+                <option value="tarjeta_credito">Tarjeta crédito</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+          </div>
+
+          <label style="font-size:.78rem;color:var(--muted); display:block; margin-top:10px">Observaciones
+            (opcional)</label>
+          <input id="inputObservacionesCambio" style="width:100%" placeholder="Notas sobre el cambio..." />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" onclick="cerrarModal('modalCambio')">Cancelar</button>
+          <button type="button" class="btn" id="btnConfirmarCambio" onclick="confirmarCambio()" disabled>Confirmar
+            cambio</button>
+        </div>
+        <div class="msg" id="msgCambio"></div>
+      </div>
+    </div>
+
+  </div>
+  <!-- fin #app -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+  <script src="js/update-banner.js"></script>
+  <script src="js/demo-banner.js"></script>
+
+</body>
+
+</html>

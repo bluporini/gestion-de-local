@@ -1,0 +1,5 @@
+# Dependencias de la demo web (backend/demo.py). Sin PyInstaller.
+Flask==3.0.3
+python-dotenv==1.0.1
+supabase==2.32.0
+gunicorn==26.2.0

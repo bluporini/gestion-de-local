@@ -1,0 +1,42 @@
+name: Limpiar respaldos viejos
+
+# Retención de los respaldos de Supabase (ver scripts/limpiar_backups.py
+# y docs/respaldos.md). Corre todos los días y también a mano desde la
+# pestaña "Actions".
+# En esta versión de portfolio solo se dispara a mano (requiere secrets de Supabase).
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Solo mostrar qué se borraría"
+        type: boolean
+        default: true
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v7
+
+      - name: Configurar Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install supabase==2.32.0
+
+      # SUPABASE_SERVICE_KEY: clave service_role del proyecto. Solo vive
+      # en este secret; nunca va en la app ni en el instalador.
+      - name: Limpiar respaldos
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python scripts/limpiar_backups.py --dry-run
+          else
+            python scripts/limpiar_backups.py
+          fi

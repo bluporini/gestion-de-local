@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Gestión de Local
+Comment=Aplicación Gestión de Local
+Exec=/opt/GestionDeLocal/GestionDeLocal
+Icon=/opt/GestionDeLocal/GestionDeLocal.png
+Terminal=false
+Type=Application
+Categories=Office;
