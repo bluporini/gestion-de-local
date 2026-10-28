@@ -72,6 +72,13 @@ CANT_MOVIMIENTOS_ENTRADA = 1700
 CANT_AJUSTES_SALIDA = 180
 CANT_CAMBIOS = 160
 
+# Probabilidad de que una venta realizada tenga envío. Las de los últimos
+# días tienen más, para que haya envíos en curso (por preparar,
+# despachados) además de los ya entregados.
+PROBABILIDAD_ENVIO = 0.10
+PROBABILIDAD_ENVIO_RECIENTE = 0.60
+DIAS_ENVIOS_RECIENTES = 10
+
 
 # ------------------------------------------------------------
 # OTROS
@@ -173,6 +180,27 @@ COLORES = [
 ]
 
 
+NOTAS_PRODUCTO = [
+    "Talla chica, recomendar un talle más.",
+    "Proveedor: pedir reposición los lunes.",
+    "No lavar con lavandina.",
+    "Viene en caja de regalo.",
+    "Se vende mucho por Instagram.",
+]
+
+NOTAS_VENTA = [
+    "Pidió envoltorio de regalo.",
+    "Pagó con descuento por compra mayorista.",
+    "Retira el resto la semana que viene.",
+    "Clienta frecuente.",
+]
+
+NOTAS_CAMBIO = [
+    "Cambio por talle.",
+    "Prenda con falla de fábrica.",
+    "No le gustó el color.",
+]
+
 METODOS_PAGO = [
     "Efectivo",
     "Tarjeta débito",
@@ -210,6 +238,84 @@ CLIENTES = [
     "Gabriela",
     "Victoria",
     "Natalia",
+]
+
+
+# Empresa -> (prefijo, largo y sufijo del número de seguimiento), rango de
+# costo y peso (qué tan seguido se usa). Prefijo None = sin seguimiento.
+EMPRESAS_ENVIO = [
+    ("Correo Argentino", ("CP", 9, "AR"), (3500, 7500), 45),
+    ("Andreani", ("36000", 10, ""), (4500, 9000), 25),
+    ("OCA", ("", 16, ""), (4000, 8500), 15),
+    ("Vía Cargo", ("VC-", 8, ""), (5000, 11000), 5),
+    ("Moto / cadete", (None, 0, ""), (2000, 4500), 10),
+]
+
+# (localidad, provincia, código postal, característica telefónica)
+LOCALIDADES = [
+    ("Rosario", "Santa Fe", "2000", "341"),
+    ("Funes", "Santa Fe", "2132", "341"),
+    ("Santa Fe", "Santa Fe", "3000", "342"),
+    ("Rafaela", "Santa Fe", "2300", "3492"),
+    ("Córdoba", "Córdoba", "5000", "351"),
+    ("Villa Carlos Paz", "Córdoba", "5152", "3541"),
+    ("Río Cuarto", "Córdoba", "5800", "358"),
+    ("CABA", "Buenos Aires", "1414", "11"),
+    ("La Plata", "Buenos Aires", "1900", "221"),
+    ("Mar del Plata", "Buenos Aires", "7600", "223"),
+    ("Bahía Blanca", "Buenos Aires", "8000", "291"),
+    ("Pergamino", "Buenos Aires", "2700", "2477"),
+    ("Paraná", "Entre Ríos", "3100", "343"),
+    ("Mendoza", "Mendoza", "5500", "261"),
+    ("San Miguel de Tucumán", "Tucumán", "4000", "381"),
+    ("Salta", "Salta", "4400", "387"),
+    ("Neuquén", "Neuquén", "8300", "299"),
+    ("Corrientes", "Corrientes", "3400", "379"),
+]
+
+CALLES = [
+    "San Martín", "Belgrano", "Rivadavia", "Mitre", "Sarmiento", "9 de Julio",
+    "Córdoba", "Entre Ríos", "Pellegrini", "Urquiza", "Moreno", "Colón",
+    "Av. Libertad", "Bv. Oroño", "Italia", "España", "Laprida", "Maipú",
+]
+
+OBSERVACIONES_ENVIO = [
+    "Dejar en portería",
+    "Tocar timbre 2B",
+    "Llamar antes de ir",
+    "Entregar después de las 14 hs",
+    "Es para regalo, no poner el precio",
+]
+
+OBSERVACIONES_PROBLEMA = [
+    "Volvió: dirección incorrecta",
+    "No había nadie en el domicilio, volvió al local",
+    "Paquete demorado en la sucursal",
+    "La clienta no lo retiró a tiempo de la sucursal",
+]
+
+# (texto, etiquetas, días atrás)
+NOTAS_EJEMPLO = [
+    ("Pedir corpiños con aro talle 95 en negro y nude", ["proveedores", "pedidos"], 2),
+    ("Llamar al proveedor de bombachas por la demora del pedido", ["proveedores", "urgente"], 1),
+    ("Pagar la factura de la luz antes del 20", ["pagos", "urgente"], 3),
+    ("Cambiar la vidriera para el Día de la Madre", ["ideas", "vidriera"], 5),
+    ("Probar ofrecer 10% de descuento pagando en efectivo", ["ideas"], 9),
+    ("Reponer bolsas y papel de regalo", ["pedidos"], 4),
+    ("Carolina pidió el conjunto encaje en rojo talle M: avisarle cuando llegue", ["clientas", "pedidos"], 6),
+    ("Pagar alquiler del local", ["pagos"], 12),
+    ("Subir fotos de los pijamas nuevos a Instagram", ["redes", "ideas"], 8),
+    ("Revisar stock de medias antes del invierno", ["stock"], 20),
+    ("Pedir presupuesto para el cartel nuevo", ["ideas", "proveedores"], 35),
+    ("Devolver al proveedor las tangas con fallas de costura", ["proveedores"], 28),
+    ("Laura quiere cambiar la bombacha por un talle más grande", ["clientas"], 15),
+    ("Pagar monotributo", ["pagos"], 40),
+    ("Armar combos de Navidad (pijama + medias)", ["ideas", "vidriera"], 60),
+    ("Contratar fotógrafa para el catálogo de verano", ["ideas", "redes"], 75),
+    ("Ordenar el depósito y contar cajas", ["stock"], 90),
+    ("Renovar el seguro del local", ["pagos"], 110),
+    ("Averiguar envíos con Andreani para el interior", ["envios"], 130),
+    ("Probar nuevo proveedor de bodies de algodón", ["proveedores"], 150),
 ]
 
 
@@ -492,6 +598,7 @@ def crear_schema(conn):
             porcentaje_ganancia REAL DEFAULT 30,
             stock_actual INTEGER DEFAULT 0,
             activo INTEGER DEFAULT 1,
+            nota TEXT DEFAULT '',
             FOREIGN KEY (tipo_id)
                 REFERENCES tipos_prenda(id)
                 ON DELETE SET NULL
@@ -530,7 +637,9 @@ def crear_schema(conn):
             estado TEXT DEFAULT 'realizada',
             tiene_cambio INTEGER DEFAULT 0,
             total_base REAL DEFAULT 0,
-            ganancia_base REAL DEFAULT 0
+            ganancia_base REAL DEFAULT 0,
+            canal TEXT NOT NULL DEFAULT 'local',
+            nota TEXT DEFAULT ''
         );
 
 
@@ -601,6 +710,47 @@ def crear_schema(conn):
                 ON DELETE CASCADE,
             FOREIGN KEY (variante_id)
                 REFERENCES variantes_producto(id)
+        );
+
+        -- Igual que en schema.sql.
+        CREATE TABLE notas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            texto TEXT NOT NULL,
+            hecha INTEGER NOT NULL DEFAULT 0,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE etiquetas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL UNIQUE COLLATE NOCASE
+        );
+
+        CREATE TABLE nota_etiquetas (
+            nota_id INTEGER NOT NULL,
+            etiqueta_id INTEGER NOT NULL,
+            PRIMARY KEY (nota_id, etiqueta_id),
+            FOREIGN KEY (nota_id) REFERENCES notas(id) ON DELETE CASCADE,
+            FOREIGN KEY (etiqueta_id) REFERENCES etiquetas(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE envios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT NOT NULL,
+            empresa TEXT NOT NULL,
+            numero_seguimiento TEXT,
+            destinatario TEXT NOT NULL,
+            telefono TEXT,
+            direccion TEXT,
+            localidad TEXT,
+            provincia TEXT,
+            codigo_postal TEXT,
+            costo REAL NOT NULL DEFAULT 0,
+            paga TEXT NOT NULL DEFAULT 'cliente',
+            estado TEXT NOT NULL DEFAULT 'por_preparar',
+            observaciones TEXT,
+            venta_id INTEGER,
+            creado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL
         );
 
 
@@ -724,9 +874,10 @@ def crear_productos(conn):
                 precio,
                 porcentaje_ganancia,
                 stock_actual,
-                activo
+                activo,
+                nota
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 codigo,
@@ -738,6 +889,10 @@ def crear_productos(conn):
                 porcentaje,
                 0,
                 1,
+                # Algunos productos con observación, para probar la nota.
+                random.choice(NOTAS_PRODUCTO)
+                if random.random() < 0.2
+                else "",
             ),
         )
 
@@ -1124,6 +1279,12 @@ def crear_ventas(conn):
             METODOS_PAGO
         )
 
+        # Aproximadamente una de cada tres ventas es virtual.
+        canal = random.choices(
+            ["local", "virtual"],
+            weights=[2, 1],
+        )[0]
+
         tipo_tarjeta = None
 
         if metodo_pago in (
@@ -1149,9 +1310,11 @@ def crear_ventas(conn):
                 estado,
                 tiene_cambio,
                 total_base,
-                ganancia_base
+                ganancia_base,
+                canal,
+                nota
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 codigo,
@@ -1169,6 +1332,10 @@ def crear_ventas(conn):
                 0,
                 0,
                 0,
+                canal,
+                random.choice(NOTAS_VENTA)
+                if random.random() < 0.1
+                else "",
             ),
         )
 
@@ -1624,7 +1791,9 @@ def crear_cambios(
                 monto_diferencia,
                 ganancia_cambio,
                 metodo_pago,
-                "Cambio de producto",
+                random.choice(NOTAS_CAMBIO)
+                if random.random() < 0.3
+                else "",
             ),
         )
 
@@ -1794,16 +1963,136 @@ def actualizar_stock_productos(conn):
 
 
 # ============================================================
+# ENVÍOS
+# ============================================================
+
+def _numero_seguimiento(formato):
+    prefijo, largo, sufijo = formato
+    if prefijo is None:
+        return None
+    digitos = "".join(random.choice("0123456789") for _ in range(largo))
+    return f"{prefijo}{digitos}{sufijo}"
+
+
+def _estado_segun_antiguedad(dias):
+    """Los envíos viejos ya llegaron; los de los últimos días están en camino."""
+    if dias <= 1:
+        return random.choices(["por_preparar", "despachado"], weights=[60, 40])[0]
+    if dias <= 7:
+        return random.choices(["despachado", "entregado", "problema"], weights=[60, 35, 5])[0]
+    return random.choices(["entregado", "problema"], weights=[95, 5])[0]
+
+
+def crear_envios(conn, ventas):
+    """
+    Crea envíos para un porcentaje de las ventas realizadas, vinculados a
+    la venta y con el cliente como destinatario. El estado depende de la
+    antigüedad del envío respecto de FECHA_REFERENCIA.
+    """
+    realizadas = {
+        r["id"]: r["cliente"]
+        for r in conn.execute("SELECT id, cliente FROM ventas WHERE estado = 'realizada'")
+    }
+    pesos_empresas = [e[3] for e in EMPRESAS_ENVIO]
+    limite_reciente = FECHA_REFERENCIA.date() - timedelta(days=DIAS_ENVIOS_RECIENTES)
+    cantidad = 0
+
+    for venta in ventas:
+        if venta["id"] not in realizadas:
+            continue
+        reciente = venta["fecha_argentina"].date() >= limite_reciente
+        if random.random() >= (PROBABILIDAD_ENVIO_RECIENTE if reciente else PROBABILIDAD_ENVIO):
+            continue
+        cantidad += 1
+
+        empresa, formato, (costo_min, costo_max), _ = random.choices(EMPRESAS_ENVIO, weights=pesos_empresas)[0]
+        localidad, provincia, cp, caracteristica = random.choice(LOCALIDADES)
+
+        # Se despacha el mismo día o hasta 2 días después de la venta.
+        fecha = min(
+            venta["fecha_argentina"].date() + timedelta(days=random.randint(0, 2)),
+            FECHA_REFERENCIA.date(),
+        )
+        estado = _estado_segun_antiguedad((FECHA_REFERENCIA.date() - fecha).days)
+
+        if estado == "problema":
+            observaciones = random.choice(OBSERVACIONES_PROBLEMA)
+        elif random.random() < 0.25:
+            observaciones = random.choice(OBSERVACIONES_ENVIO)
+        else:
+            observaciones = None
+
+        conn.execute(
+            """
+            INSERT INTO envios (
+                fecha, empresa, numero_seguimiento, destinatario, telefono,
+                direccion, localidad, provincia, codigo_postal,
+                costo, paga, estado, observaciones, venta_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                fecha.isoformat(),
+                empresa,
+                _numero_seguimiento(formato),
+                realizadas[venta["id"]] or random.choice(CLIENTES),
+                f"{caracteristica} {random.randint(400, 699)}-{random.randint(1000, 9999)}",
+                f"{random.choice(CALLES)} {random.randint(100, 3999)}",
+                localidad,
+                provincia,
+                cp,
+                round(random.randint(costo_min, costo_max), -2),
+                random.choices(["cliente", "local"], weights=[70, 30])[0],
+                estado,
+                observaciones,
+                venta["id"],
+            ),
+        )
+
+    conn.commit()
+    return cantidad
+
+
+# ============================================================
+# NOTAS
+# ============================================================
+
+def crear_notas(conn):
+    """
+    Crea notas de ejemplo con etiquetas. Las más viejas están casi todas
+    tachadas (ya resueltas); las recientes, casi todas pendientes.
+    """
+    for texto, etiquetas, dias_atras in NOTAS_EJEMPLO:
+        fecha = inicio_horario_comercial(FECHA_REFERENCIA - timedelta(days=dias_atras)) \
+            + timedelta(minutes=random.randint(0, 600))
+        hecha = random.random() < (0.8 if dias_atras > 30 else 0.2)
+
+        nota_id = conn.execute(
+            "INSERT INTO notas (texto, hecha, fecha) VALUES (?, ?, ?)",
+            (texto, 1 if hecha else 0, fecha_sql_utc(fecha)),
+        ).lastrowid
+
+        for nombre in etiquetas:
+            conn.execute("INSERT OR IGNORE INTO etiquetas (nombre) VALUES (?)", (nombre,))
+            conn.execute(
+                """
+                INSERT INTO nota_etiquetas (nota_id, etiqueta_id)
+                SELECT ?, id FROM etiquetas WHERE nombre = ?
+                """,
+                (nota_id, nombre),
+            )
+
+    conn.commit()
+    return len(NOTAS_EJEMPLO)
+
+
+# ============================================================
 # CONFIGURACIÓN
 # ============================================================
 
 def crear_configuracion(conn):
 
     valores = [
-        (
-            "usuario",
-            "admin",
-        ),
         (
             "porcentaje_ganancia_default",
             str(
@@ -1841,6 +2130,8 @@ def mostrar_resumen(
     ventas_creadas,
     cambios_creados,
     ajustes_creados,
+    envios_creados=0,
+    notas_creadas=0,
 ):
 
     productos = conn.execute(
@@ -2009,6 +2300,14 @@ def mostrar_resumen(
     )
 
     print(
+        f"Envíos:              {envios_creados}"
+    )
+
+    print(
+        f"Notas:               {notas_creadas}"
+    )
+
+    print(
         f"Movimientos stock:   {movimientos}"
     )
 
@@ -2117,23 +2416,34 @@ def main():
             ventas,
         )
 
-        # 8. Recalcular stock de productos
+        # 8. Envíos y notas
+        envios_creados = crear_envios(
+            conn,
+            ventas,
+        )
+        notas_creadas = crear_notas(
+            conn
+        )
+
+        # 9. Recalcular stock de productos
         actualizar_stock_productos(
             conn
         )
 
-        # 9. Configuración
+        # 10. Configuración
         crear_configuracion(
             conn
         )
 
-        # 10. Resumen
+        # 11. Resumen
         mostrar_resumen(
             conn,
             db_path,
             len(ventas),
             cambios_creados,
             ajustes_creados,
+            envios_creados,
+            notas_creadas,
         )
 
     finally:

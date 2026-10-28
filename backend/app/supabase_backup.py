@@ -41,10 +41,24 @@ else:
 
 BUCKET_NAME = "backups"
 
+# Carpetas del bucket: los respaldos de la app instalada en la PC de la
+# clienta van a "clienta/" y los hechos en desarrollo (app sin compilar)
+# a "desarrollo/". Así una prueba local nunca se mezcla con sus respaldos
+# ni altera su retención (scripts/limpiar_backups.py).
+CARPETA_CLIENTA = "clienta"
+CARPETA_DESARROLLO = "desarrollo"
+
 # Archivo junto a la base con el estado del último respaldo. Se guarda
 # fuera de la base a propósito: escribir en la base cambia su fecha de
 # modificación y haría parecer que siempre hay cambios sin respaldar.
 ESTADO_FILENAME = "estado_backup.json"
+
+
+def ruta_en_bucket(nombre_archivo):
+    """Ruta dentro del bucket: ``clienta/`` en la app compilada, o
+    ``desarrollo/`` si se está corriendo el código sin compilar."""
+    carpeta = CARPETA_CLIENTA if getattr(sys, "frozen", False) else CARPETA_DESARROLLO
+    return f"{carpeta}/{nombre_archivo}"
 
 
 def _get_supabase() -> Client:
@@ -172,8 +186,8 @@ def hacer_backup_ahora():
         Resultado de la operación con las siguientes claves:
 
         - ``ok`` : ``True`` si el backup se completó correctamente.
-        - ``archivo`` : nombre del archivo subido a Supabase cuando la
-          operación fue exitosa.
+        - ``archivo`` : ruta del archivo subido dentro del bucket
+          (``clienta/...`` o ``desarrollo/...``, ver ``ruta_en_bucket``).
         - ``ok`` : ``False`` y ``error`` con el mensaje de la excepción si
           alguna etapa del proceso falla.
 
@@ -194,9 +208,10 @@ def hacer_backup_ahora():
         with tempfile.TemporaryDirectory() as carpeta:
             ruta_backup, nombre_archivo = _crear_backup_comprimido(carpeta)
 
+            ruta = ruta_en_bucket(nombre_archivo)
             with open(ruta_backup, "rb") as archivo:
                 supabase.storage.from_(BUCKET_NAME).upload(
-                    nombre_archivo,
+                    ruta,
                     archivo,
                     {"content-type": "application/gzip"},
                 )
@@ -205,7 +220,7 @@ def hacer_backup_ahora():
 
         return {
             "ok": True,
-            "archivo": nombre_archivo,
+            "archivo": ruta,
         }
 
     except Exception as e:

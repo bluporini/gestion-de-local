@@ -193,3 +193,19 @@ def test_misma_variante_repetida_en_items_devueltos_no_devuelve_de_mas(client, e
 
     assert res.status_code == 400
     assert stock_variante(a) == 3
+
+
+def test_editar_la_nota_de_un_cambio_no_toca_stock_ni_la_venta(client, escenario):
+    a, b, v = escenario["a"], escenario["b"], escenario["venta"]
+    cambio = _cambio(client, v["id"], devueltos=[(a, 1)], nuevos=[(b, 1)], monto=500).get_json()
+    antes = venta(v["id"])
+
+    res = client.patch(f"/api/cambios/{cambio['id']}/observaciones", json={"observaciones": "Cambio por talle"})
+
+    assert res.status_code == 200
+    assert res.get_json()["observaciones"] == "Cambio por talle"
+    assert res.get_json()["monto_diferencia"] == 500
+    assert stock_variante(a) == 4
+    assert stock_variante(b) == 3
+    assert venta(v["id"]) == antes
+    assert client.patch("/api/cambios/9999/observaciones", json={"observaciones": "x"}).status_code == 404

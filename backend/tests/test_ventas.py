@@ -181,3 +181,48 @@ def test_falla_a_mitad_de_una_venta_no_deja_nada_a_medias_ni_la_base_bloqueada(c
     assert otra.execute("SELECT COUNT(*) FROM ventas").fetchone()[0] == 0
     otra.close()
     assert stock_variante(a) == 5
+
+
+def test_venta_sin_canal_queda_local_y_se_puede_marcar_virtual(variantes, vender):
+    a, _ = variantes
+
+    assert vender([{"variante_id": a, "cantidad": 1}])["canal"] == "local"
+    assert vender([{"variante_id": a, "cantidad": 1}], canal="virtual")["canal"] == "virtual"
+
+
+def test_canal_invalido_da_400_y_no_toca_stock(client, variantes):
+    a, _ = variantes
+    res = client.post("/api/ventas", json={
+        "metodo_pago": "efectivo", "monto_pagado": 99999, "canal": "otro",
+        "items": [{"variante_id": a, "cantidad": 1}],
+    })
+
+    assert res.status_code == 400
+    assert stock_variante(a) == 5
+
+
+def test_editar_venta_cambia_el_canal(client, variantes, vender):
+    a, _ = variantes
+    v = vender([{"variante_id": a, "cantidad": 1}])
+
+    res = client.patch(f"/api/ventas/{v['id']}", json={"canal": "virtual"})
+    assert res.status_code == 200
+    assert res.get_json()["canal"] == "virtual"
+    assert res.get_json()["cliente"] == v["cliente"]
+
+    res = client.patch(f"/api/ventas/{v['id']}", json={"canal": "otro"})
+    assert res.status_code == 400
+
+
+def test_nota_de_la_venta_se_guarda_al_crear_y_se_edita_sin_tocar_lo_demas(client, variantes, vender):
+    a, _ = variantes
+    v = vender([{"variante_id": a, "cantidad": 1}], nota="Envoltorio de regalo", canal="virtual")
+    assert v["nota"] == "Envoltorio de regalo"
+    assert vender([{"variante_id": a, "cantidad": 1}])["nota"] == ""
+
+    res = client.patch(f"/api/ventas/{v['id']}", json={"nota": ""})
+    editada = res.get_json()
+    assert editada["nota"] == ""
+    assert editada["canal"] == "virtual"
+    assert editada["total"] == v["total"]
+    assert stock_variante(a) == 3

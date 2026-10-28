@@ -123,3 +123,27 @@ def test_init_db_corrige_bases_viejas_sin_triggers(client, crear_producto):
     triggers = {r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")}
     conn.close()
     assert {"trg_stock_producto_insert", "trg_stock_producto_update", "trg_stock_producto_delete"} <= triggers
+
+
+def test_nota_del_producto_se_guarda_al_crear_y_se_edita_sin_tocar_lo_demas(client):
+    res = client.post("/api/productos", json={
+        "nombre": "Corpiño", "codigo": "NOTA001", "nota": "Talla chica",
+        "variantes": [{"stock": 2, "costo": 1000, "precio": 2000}],
+    })
+    assert res.status_code == 201
+    producto = res.get_json()
+    assert producto["nota"] == "Talla chica"
+
+    res = client.patch(f"/api/productos/{producto['id']}", json={"nota": "Pedir reposición"})
+    editado = res.get_json()
+    assert editado["nota"] == "Pedir reposición"
+    assert editado["nombre"] == "Corpiño"
+    assert editado["stock_actual"] == 2
+
+    # Editar otro dato no borra la nota.
+    res = client.patch(f"/api/productos/{producto['id']}", json={"nombre": "Corpiño soft"})
+    assert res.get_json()["nota"] == "Pedir reposición"
+
+
+def test_producto_sin_nota_queda_con_nota_vacia(crear_producto):
+    assert crear_producto([{"stock": 1, "costo": 1000, "precio": 2000}])["nota"] == ""

@@ -25,6 +25,9 @@
         <button data-tab="ventas">💲 Ventas</button>
         <button data-tab="cambios">🔄 Cambios</button>
         <button data-tab="productos">👕 Productos</button>
+        <button data-tab="estadisticas">📊 Estadísticas</button>
+        <button data-tab="envios">📦 Envíos</button>
+        <button data-tab="notas">📝 Notas</button>
         <button data-tab="configuracion">⚙️ Configuración</button>
       </nav>
     </aside>
@@ -39,6 +42,7 @@
             <button class="btn" onclick="abrirModalCambio()">+ Registrar cambio</button>
             <button class="btn" onclick="abrirModalVenta()">+ Agregar venta</button>
             <button class="btn" onclick="abrirResumenCaja()">Resumen de caja</button>
+            <button class="btn" onclick="abrirVentasUltimosMeses()">Ventas últimos 3 meses</button>
           </div>
         </div>
 
@@ -272,6 +276,89 @@
         </div>
       </section>
 
+      <!-- ===================== ESTADÍSTICAS ===================== -->
+      <section id="estadisticas">
+        <div class="toolbar">
+          <h3 style="margin:0">Últimos 12 meses</h3>
+        </div>
+        <div class="estadisticas-grid">
+          <div class="panel">
+            <h3>💰 Ingresos por mes</h3>
+            <div class="grafico-wrap" id="graficoIngresos"></div>
+            <div class="grafico-total" id="totalIngresos"></div>
+          </div>
+          <div class="panel">
+            <h3>📈 Ganancia por mes</h3>
+            <div class="grafico-wrap" id="graficoGanancia"></div>
+            <div class="grafico-total" id="totalGanancia"></div>
+          </div>
+          <div class="panel">
+            <h3>🛍️ Cantidad de ventas por mes</h3>
+            <div class="grafico-wrap" id="graficoVentas"></div>
+            <div class="grafico-total" id="totalVentas"></div>
+          </div>
+          <div class="panel">
+            <h3>🏪📱 Ventas por canal (local y virtual)</h3>
+            <div class="grafico-leyenda">
+              <span><i class="muestra local"></i>Local</span>
+              <span><i class="muestra virtual"></i>Virtual</span>
+            </div>
+            <div class="grafico-wrap" id="graficoCanal"></div>
+            <div class="grafico-total" id="totalCanal"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== ENVÍOS ===================== -->
+      <section id="envios">
+        <div class="toolbar">
+          <h3 style="margin:0">Envíos</h3>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <input id="buscarEnvios" placeholder="Buscar destinatario, localidad, seguimiento o venta..." style="min-width:280px" />
+            <button class="btn" onclick="abrirModalEnvio()">+ Nuevo envío</button>
+          </div>
+        </div>
+        <div class="filtros-estado" id="filtrosEnvio">
+          <button class="chip active" data-estado="">Todos</button>
+          <button class="chip" data-estado="por_preparar">📋 Por preparar</button>
+          <button class="chip" data-estado="despachado">🚚 Despachados</button>
+          <button class="chip" data-estado="entregado">✅ Entregados</button>
+          <button class="chip" data-estado="problema">⚠️ Devuelto / Problema</button>
+          <button class="chip" data-estado="resuelto">✔ Resueltos</button>
+        </div>
+        <div id="listaEnvios"></div>
+      </section>
+
+      <!-- ===================== NOTAS ===================== -->
+      <section id="notas">
+        <div class="toolbar">
+          <h3 style="margin:0">Notas</h3>
+        </div>
+
+        <div class="panel">
+          <form id="formNuevaNota" class="nueva-nota">
+            <textarea id="textoNuevaNota" rows="2" maxlength="2000"
+              placeholder="Escribí una nota... (Enter para guardar, Shift+Enter para otra línea)"></textarea>
+            <div class="nueva-nota-pie">
+              <input id="etiquetasNuevaNota" list="sugerenciasEtiquetas" autocomplete="off"
+                placeholder="Etiquetas (opcional), separadas por coma: proveedores, urgente" />
+              <button type="submit" class="btn">Agregar</button>
+            </div>
+          </form>
+          <datalist id="sugerenciasEtiquetas"></datalist>
+        </div>
+
+        <div class="filtros-notas">
+          <div class="filtros-estado" id="filtrosEtiquetas"></div>
+          <div class="filtros-notas-derecha">
+            <input id="buscarNotas" placeholder="Buscar en las notas..." />
+            <label class="check-ocultar"><input type="checkbox" id="ocultarHechas" /> Ocultar tachadas</label>
+          </div>
+        </div>
+
+        <div class="lista-notas" id="listaNotas"></div>
+      </section>
+
       <!-- ===================== CONFIGURACIÓN ===================== -->
       <section id="configuracion">
         <div class="config-grid">
@@ -290,6 +377,20 @@
               </form>
               <div class="msg" id="msgTipo"></div>
             </div>
+
+            <div class="panel config-section">
+              <h3>Aviso de stock bajo
+                <span class="help-icon"
+                  data-help="Las variantes con esta cantidad de unidades o menos (pero más de 0) aparecen en la tabla &quot;Stock bajo&quot; del dashboard.">?</span>
+              </h3>
+              <form id="formStockBajo" class="stock-bajo-form">
+                <span>Avisar cuando queden</span>
+                <input type="number" id="umbralStockBajo" min="1" max="1000" step="1" required />
+                <span>unidades o menos</span>
+                <button type="submit" class="btn small">Guardar</button>
+              </form>
+              <div class="msg" id="msgStockBajo"></div>
+            </div>
           </div>
 
           <div class="panel config-section">
@@ -305,6 +406,32 @@
             </button>
 
             <div class="msg" id="msgBackupDrive"></div>
+
+            <h4 class="config-subtitulo">Restaurar desde archivo
+              <span class="help-icon"
+                data-help="Reemplaza TODOS los datos actuales por los del respaldo elegido (.db.gz descargado de Supabase, o .db). Antes se guarda una copia de los datos actuales por si hay que volver atrás.">?</span>
+            </h4>
+            <input type="file" id="archivoRestaurar" accept=".gz,.db" />
+            <button type="button" class="btn danger" id="btnRestaurar" onclick="restaurarDesdeArchivo()">
+              ♻️ Restaurar respaldo
+            </button>
+            <div class="msg" id="msgRestaurar"></div>
+          </div>
+
+          <div class="panel config-section">
+            <h3>Exportar a Excel
+              <span class="help-icon"
+                data-help="Descarga un archivo .csv que se abre con Excel.">?</span>
+            </h3>
+            <div class="exportar-fechas">
+              <label>Desde <input type="date" id="exportarDesde" /></label>
+              <label>Hasta <input type="date" id="exportarHasta" /></label>
+            </div>
+            <div class="exportar-botones">
+              <button type="button" class="btn secondary" onclick="exportarVentasCSV()">📊 Ventas del período</button>
+              <button type="button" class="btn secondary" onclick="exportarStockCSV()">📦 Stock actual</button>
+            </div>
+            <div class="msg" id="msgExportar"></div>
           </div>
 
         </div>
@@ -340,12 +467,30 @@
           <div class="variantes-list" id="variantesList"></div>
           <button type="button" class="btn secondary small" onclick="agregarFilaVariante()">+ Agregar variante</button>
 
+          <label style="font-size:.85rem;color:var(--muted); font-weight:600; display:block; margin-top:14px">
+            Observación
+          </label>
+          <textarea name="nota" class="texto-nota" rows="3" placeholder="Notas sobre el producto (opcional)"></textarea>
+
           <div class="modal-actions">
             <button type="button" class="btn secondary" onclick="cerrarModal('modalProducto')">Cancelar</button>
             <button type="submit" class="btn" id="btnGuardarProducto">Guardar producto</button>
           </div>
           <div class="msg" id="msgProducto"></div>
         </form>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: NOTA (productos, ventas, cambios) ===================== -->
+    <div class="modal-backdrop" id="modalNota">
+      <div class="modal" style="width:480px">
+        <h3 id="tituloNota">Nota</h3>
+        <textarea id="notaTexto" class="texto-nota" rows="6" placeholder="Escribí una observación..."></textarea>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" onclick="cerrarModal('modalNota')">Cancelar</button>
+          <button type="button" class="btn" onclick="guardarModalNota()">Guardar nota</button>
+        </div>
+        <div class="msg" id="msgNota"></div>
       </div>
     </div>
 
@@ -356,6 +501,12 @@
 
         <label style="font-size:.78rem;color:var(--muted)">Cliente</label>
         <input id="inputCliente" placeholder="Nombre del cliente (opcional)" style="width:100%; margin-bottom:12px" />
+
+        <label style="font-size:.78rem;color:var(--muted)">Canal de venta</label>
+        <div class="canal-toggle" id="canalVenta">
+          <button type="button" class="chip active" data-canal="local" onclick="seleccionarCanal('canalVenta', 'local')">🏪 Local</button>
+          <button type="button" class="chip" data-canal="virtual" onclick="seleccionarCanal('canalVenta', 'virtual')">📱 Virtual</button>
+        </div>
 
         <label style="font-size:.78rem;color:var(--muted)">Buscar producto</label>
         <div class="buscador-wrap">
@@ -411,6 +562,9 @@
           </select>
         </div>
 
+        <label style="font-size:.78rem;color:var(--muted); display:block; margin-top:10px">Observación (opcional)</label>
+        <textarea id="inputNotaVenta" class="texto-nota" rows="2" placeholder="Notas sobre la venta..."></textarea>
+
         <div class="modal-actions">
           <button type="button" class="btn secondary" onclick="cerrarModal('modalVenta')">Cancelar</button>
           <button type="button" class="btn" onclick="confirmarVenta()">Confirmar venta</button>
@@ -426,6 +580,11 @@
         <input type="hidden" id="ventaIdEdit" />
         <label style="font-size:.78rem;color:var(--muted)">Cliente</label>
         <input id="editCliente" style="width:100%; margin-bottom:12px" />
+        <label style="font-size:.78rem;color:var(--muted)">Canal de venta</label>
+        <div class="canal-toggle" id="editCanal">
+          <button type="button" class="chip active" data-canal="local" onclick="seleccionarCanal('editCanal', 'local')">🏪 Local</button>
+          <button type="button" class="chip" data-canal="virtual" onclick="seleccionarCanal('editCanal', 'virtual')">📱 Virtual</button>
+        </div>
         <label style="font-size:.78rem;color:var(--muted)">Método de pago</label>
         <select id="editMetodoPago" style="width:100%">
           <option value="efectivo">Efectivo</option>
@@ -444,6 +603,19 @@
       </div>
     </div>
 
+    <!-- ===================== MODAL: VENTAS ÚLTIMOS 3 MESES ===================== -->
+    <div class="modal-backdrop" id="modalVentasMeses">
+      <div class="modal" style="width:620px">
+        <h3>Ventas de los últimos 3 meses</h3>
+        <textarea id="textoVentasMeses" class="resumen-caja-texto" readonly rows="14"></textarea>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" onclick="copiarVentasUltimosMeses()">📋 Copiar</button>
+          <button type="button" class="btn" onclick="cerrarModal('modalVentasMeses')">Listo</button>
+        </div>
+        <div class="msg" id="msgVentasMeses"></div>
+      </div>
+    </div>
+
     <!-- ===================== MODAL: RESUMEN DE CAJA ===================== -->
     <div class="modal-backdrop" id="modalResumenCaja">
       <div class="modal" style="width:860px">
@@ -455,6 +627,84 @@
           <button type="button" class="btn" onclick="cerrarModal('modalResumenCaja')">Listo</button>
         </div>
         <div class="msg" id="msgResumenCaja"></div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: ENVÍO ===================== -->
+    <div class="modal-backdrop" id="modalEnvio">
+      <div class="modal modal-envio">
+        <h3 id="tituloModalEnvio">Nuevo envío</h3>
+        <form id="formEnvio" class="form-envio">
+          <div class="form-envio-grid">
+            <label>Fecha
+              <input type="date" id="envioFecha" required />
+            </label>
+            <label>Empresa
+              <input id="envioEmpresa" list="empresasEnvio" placeholder="Correo Argentino" required />
+              <datalist id="empresasEnvio">
+                <option value="Correo Argentino"></option>
+                <option value="Andreani"></option>
+                <option value="OCA"></option>
+                <option value="Vía Cargo"></option>
+                <option value="Moto / cadete"></option>
+              </datalist>
+            </label>
+            <label>N° de seguimiento
+              <input id="envioSeguimiento" placeholder="Opcional" />
+            </label>
+            <label>Estado
+              <select id="envioEstado">
+                <option value="por_preparar">📋 Por preparar</option>
+                <option value="despachado">🚚 Despachado</option>
+                <option value="entregado">✅ Entregado</option>
+                <option value="problema">⚠️ Devuelto / Problema</option>
+                <option value="resuelto">✔ Resuelto</option>
+              </select>
+            </label>
+            <label class="ancho-completo">Destinatario
+              <input id="envioDestinatario" placeholder="Nombre y apellido" required />
+            </label>
+            <label>Teléfono
+              <input id="envioTelefono" />
+            </label>
+            <label>Dirección
+              <input id="envioDireccion" placeholder="Calle, número, piso" />
+            </label>
+            <label>Localidad
+              <input id="envioLocalidad" />
+            </label>
+            <label>Provincia
+              <input id="envioProvincia" />
+            </label>
+            <label>Código postal
+              <input id="envioCP" />
+            </label>
+            <label>Costo del envío
+              <input id="envioCosto" inputmode="numeric" placeholder="0" />
+            </label>
+            <label>¿Quién paga el envío?
+              <select id="envioPaga">
+                <option value="cliente">El cliente</option>
+                <option value="local">El local</option>
+              </select>
+            </label>
+            <label class="ancho-completo">Venta vinculada (opcional)
+              <div class="buscador-wrap">
+                <input id="buscadorVentaEnvio" placeholder="Buscar por código de venta o cliente..." autocomplete="off" />
+                <div class="buscador-resultados" id="resultadosVentaEnvio"></div>
+              </div>
+              <div class="venta-vinculada" id="ventaVinculadaEnvio"></div>
+            </label>
+            <label class="ancho-completo">Observaciones
+              <textarea id="envioObservaciones" rows="2"></textarea>
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn secondary" onclick="cerrarModal('modalEnvio')">Cancelar</button>
+            <button type="submit" class="btn">Guardar envío</button>
+          </div>
+          <div class="msg" id="msgEnvio"></div>
+        </form>
       </div>
     </div>
 
@@ -535,9 +785,9 @@
             </div>
           </div>
 
-          <label style="font-size:.78rem;color:var(--muted); display:block; margin-top:10px">Observaciones
+          <label style="font-size:.78rem;color:var(--muted); display:block; margin-top:10px">Observación
             (opcional)</label>
-          <input id="inputObservacionesCambio" style="width:100%" placeholder="Notas sobre el cambio..." />
+          <textarea id="inputObservacionesCambio" class="texto-nota" rows="2" placeholder="Notas sobre el cambio..."></textarea>
         </div>
 
         <div class="modal-actions">
@@ -555,6 +805,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script type="module" src="js/main.js"></script>
   <script src="js/update-banner.js"></script>
+  <script src="js/help-tooltip.js"></script>
   <script src="js/demo-banner.js"></script>
 
 </body>

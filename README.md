@@ -1,4 +1,4 @@
-# Gestión de Local · Alba Ropa Íntima
+# Gestión de Local 
 
 [![Tests](https://github.com/bluporini/gestion-de-local/actions/workflows/tests.yml/badge.svg)](https://github.com/bluporini/gestion-de-local/actions/workflows/tests.yml)
 
@@ -16,10 +16,14 @@ Este repositorio es la versión pública para portfolio (publicada con autorizac
 ## Qué hace
 
 - **Productos con variantes** (talle, color, pack), cada una con su stock, costo, precio y margen. Códigos generados automáticamente.
-- **Ventas** con carrito, efectivo (calcula el vuelto) o tarjeta, y códigos de venta por día.
+- **Ventas** con carrito, efectivo (calcula el vuelto) o tarjeta, códigos de venta por día y **canal de venta** (en el local o virtual).
 - **Cambios y devoluciones parciales**: devolver una prenda y llevarse otra, con la diferencia de dinero y el impacto en stock y ganancia. Editables y reversibles.
-- **Dashboard y caja diaria**: ingresos y ganancia del día, semana y mes, stock bajo, y un resumen de caja listo para enviar por WhatsApp o exportar a PDF.
-- **Respaldos automáticos** en Supabase al abrir y cerrar la app.
+- **Dashboard y caja diaria**: ingresos y ganancia del día, semana y mes, stock bajo (con umbral configurable), un resumen de caja listo para enviar por WhatsApp o exportar a PDF, y el monto vendido en los últimos 3 meses.
+- **Estadísticas de 12 meses**: ingresos, ganancia, cantidad de ventas y ventas por canal, con gráficos hechos en HTML/CSS para que funcionen sin internet.
+- **Envíos**: seguimiento por estado (por preparar, despachado, entregado, con problema, resuelto), que se pueden vincular a la venta.
+- **Notas**: una lista de pendientes con etiquetas, y observaciones en cada producto, venta y cambio.
+- **Exportar a Excel** (CSV) las ventas de un período y el stock.
+- **Respaldos automáticos** en Supabase al abrir y cerrar la app, y **restauración** desde un archivo de respaldo.
 - **Actualizaciones automáticas**: avisa cuando hay versión nueva y se actualiza al reabrirla.
 
 ## Requerimientos del cliente
@@ -28,6 +32,7 @@ Los requerimientos se definieron en reuniones con el cliente a lo largo del desa
 
 - **Identidad visual:** una interfaz con **fondo rosa**, acorde a la imagen del comercio.
 - **Resumen de caja para WhatsApp:** al cierre del día, la app arma un **texto con las ventas, los cambios y los totales por medio de pago**, listo para copiar y pegar en WhatsApp con un clic (también se puede exportar a PDF).
+- **Ventas en el local y virtuales:** cada venta registra su canal, y las estadísticas muestran mes a mes cuántas ventas hubo en cada uno.
 
 ## Stack
 
@@ -81,7 +86,7 @@ python -m pytest -q            # tests
 
 ## Demo online
 
-La demo web usa el mismo código, servido con gunicorn (`backend/demo.py`): genera la base de ejemplo con fecha de hoy al arrancar, muestra un cartel de demo y deshabilita los respaldos. Se despliega en Render con `render.yaml` (plan gratuito). El disco es efímero, así que los datos se reinician solos cuando el servidor se reinicia.
+La demo web usa el mismo código, servido con gunicorn (`backend/demo.py`): genera la base de ejemplo con fecha de hoy al arrancar, muestra un cartel de demo y deshabilita los respaldos y la restauración. Se despliega en Render con `render.yaml` (plan gratuito). El disco es efímero, así que los datos se reinician solos cuando el servidor se reinicia.
 
 ## Estructura
 

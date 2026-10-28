@@ -1,6 +1,6 @@
 import { $, apiUrlInput, apiFetch } from './api.js';
 import { cargarTipos } from './productos.js';
-import { esc } from './utils.js';
+import { esc, hoyISO } from './utils.js';
 
 // ---------- Tipos de prenda ----------
 
@@ -68,6 +68,146 @@ export async function borrarTipo(id) {
  *
  * @returns {void}
  */
+// ---------- Restaurar respaldo ----------
+
+
+/**
+ * Reemplaza la base local por la del archivo de respaldo elegido.
+ *
+ * Pide confirmación (reemplaza todos los datos) y, si sale bien, recarga
+ * la página para mostrar los datos restaurados.
+ *
+ * @returns {Promise<void>}
+ */
+export async function restaurarDesdeArchivo() {
+  const input = $('#archivoRestaurar');
+  const msg = $('#msgRestaurar');
+  const archivo = input.files[0];
+
+  if (!archivo) {
+    msg.className = 'msg error';
+    msg.textContent = 'Elegí primero el archivo de respaldo.';
+    return;
+  }
+  if (!confirm(
+    `¿Restaurar el respaldo "${archivo.name}"?\n\n` +
+    'Se van a REEMPLAZAR todos los datos actuales (productos, ventas, cambios) ' +
+    'por los del respaldo. Antes se guarda una copia de los datos actuales.'
+  )) return;
+
+  const boton = $('#btnRestaurar');
+  boton.disabled = true;
+  msg.className = 'msg';
+  msg.textContent = '⏳ Restaurando...';
+
+  try {
+    const datos = new FormData();
+    datos.append('archivo', archivo);
+    const res = await apiFetch('/api/backup/restaurar', { method: 'POST', body: datos });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'No se pudo restaurar el respaldo.');
+
+    msg.className = 'msg ok';
+    msg.textContent = '✓ Respaldo restaurado. Recargando...';
+    setTimeout(() => location.reload(), 1500);
+  } catch (err) {
+    msg.className = 'msg error';
+    msg.textContent = '✗ ' + err.message;
+    boton.disabled = false;
+  }
+}
+
+
+// ---------- Exportar a Excel (CSV) ----------
+
+
+/**
+ * Completa el rango de exportación con el mes en curso.
+ */
+export function initExportar() {
+  const hoy = hoyISO();
+  $('#exportarDesde').value = hoy.slice(0, 8) + '01';
+  $('#exportarHasta').value = hoy;
+}
+
+
+/**
+ * Descarga el CSV de ventas del rango elegido.
+ */
+export function exportarVentasCSV() {
+  const desde = $('#exportarDesde').value;
+  const hasta = $('#exportarHasta').value;
+  const msg = $('#msgExportar');
+
+  if (!desde || !hasta) {
+    msg.className = 'msg error';
+    msg.textContent = 'Elegí las dos fechas.';
+    return;
+  }
+  if (desde > hasta) {
+    msg.className = 'msg error';
+    msg.textContent = 'La fecha "Desde" es posterior a "Hasta".';
+    return;
+  }
+  msg.textContent = '';
+  window.location.href = `/api/exportar/ventas.csv?desde=${desde}&hasta=${hasta}`;
+}
+
+
+/**
+ * Descarga el CSV con el stock actual.
+ */
+export function exportarStockCSV() {
+  $('#msgExportar').textContent = '';
+  window.location.href = '/api/exportar/stock.csv';
+}
+
+
+// ---------- Aviso de stock bajo ----------
+
+
+/**
+ * Carga en el formulario el umbral de stock bajo configurado.
+ *
+ * @returns {Promise<void>}
+ */
+export async function cargarUmbralStockBajo() {
+  const res = await apiFetch('/api/configuracion');
+  if (!res.ok) return;
+  const data = await res.json();
+  $('#umbralStockBajo').value = data.stock_bajo_umbral;
+}
+
+
+/**
+ * Inicializa el formulario del umbral de stock bajo.
+ *
+ * @param {Function} onGuardado - Se llama después de guardar (para refrescar el dashboard).
+ */
+export function initFormStockBajo(onGuardado) {
+  $('#formStockBajo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const umbral = parseInt($('#umbralStockBajo').value, 10);
+    const msg = $('#msgStockBajo');
+
+    const res = await apiFetch('/api/configuracion', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stock_bajo_umbral: umbral })
+    });
+
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = 'Guardado ✅';
+      if (onGuardado) onGuardado();
+    } else {
+      const err = await res.json();
+      msg.className = 'msg error';
+      msg.textContent = err.error || 'No se pudo guardar';
+    }
+  });
+}
+
+
 export function initFormTipo() {
   $('#formTipo').addEventListener('submit', async (e) => {
     e.preventDefault();

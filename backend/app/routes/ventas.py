@@ -7,6 +7,9 @@ ventas_bp = Blueprint("ventas", __name__, url_prefix="/api/ventas")
 # Argentina es UTC-3 (sin horario de verano)
 OFFSET_ARGENTINA_HORAS = 3 
 
+# Dónde se hizo la venta: en el local o por canales virtuales (redes, web).
+CANALES_VENTA = ("local", "virtual")
+
 def _rango_utc_para_dia_local(fecha_str):
     """Convierte un día local de Argentina en su rango equivalente en UTC.
 
@@ -329,6 +332,12 @@ def crear_venta():
         método de pago es ``"efectivo"`` y debe ser igual o mayor al
         total de la venta.
 
+    canal : str, optional
+        ``"local"`` o ``"virtual"``. Por defecto es ``"local"``.
+
+    nota : str, optional
+        Observación libre sobre la venta.
+
     items : list of dict
         Ítems incluidos en la venta. Cada elemento debe contener:
 
@@ -403,6 +412,11 @@ def crear_venta():
     items = body.get("items", [])
     tipo_tarjeta = body.get("tipo_tarjeta")
     monto_pagado = body.get("monto_pagado")
+    canal = body.get("canal") or "local"
+    nota = body.get("nota") or ""
+
+    if canal not in CANALES_VENTA:
+        return jsonify({"error": "canal debe ser 'local' o 'virtual'"}), 400
 
     if not metodo_pago or not items:
         return jsonify({"error": "metodo_pago e items son requeridos"}), 400
@@ -488,8 +502,8 @@ def crear_venta():
 
     # Insertar la venta
     cursor.execute("""
-        INSERT INTO ventas (codigo, cliente, metodo_pago, tipo_tarjeta, monto_pagado, vuelto, total, ganancia, estado, total_base, ganancia_base)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'realizada', ?, ?)
+        INSERT INTO ventas (codigo, cliente, metodo_pago, tipo_tarjeta, monto_pagado, vuelto, total, ganancia, estado, total_base, ganancia_base, canal, nota)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'realizada', ?, ?, ?, ?)
     """, (
         codigo_venta,
         cliente,
@@ -500,7 +514,9 @@ def crear_venta():
         total,
         round(ganancia_total, 2),
         total,
-        round(ganancia_total, 2)
+        round(ganancia_total, 2),
+        canal,
+        nota
     ))
 
     venta_id = cursor.lastrowid
@@ -535,8 +551,8 @@ def crear_venta():
 def editar_venta(venta_id):
     """Actualiza datos generales de una venta.
 
-    Permite modificar únicamente el cliente y el método de pago de una
-    venta existente. No modifica sus ítems, cantidades, precios, total,
+    Permite modificar únicamente el cliente, el método de pago, el canal
+    y la nota de una venta existente. No modifica sus ítems, cantidades, precios, total,
     ganancia ni stock.
 
     Parameters
@@ -552,6 +568,12 @@ def editar_venta(venta_id):
     metodo_pago : str, optional
         Nuevo método de pago de la venta.
 
+    canal : str, optional
+        ``"local"`` o ``"virtual"``.
+
+    nota : str, optional
+        Observación libre sobre la venta.
+
     Returns
     -------
     flask.Response
@@ -562,15 +584,19 @@ def editar_venta(venta_id):
 
     Notes
     -----
-    Los campos distintos de ``cliente`` y ``metodo_pago`` se ignoran.
+    Los campos distintos de ``cliente``, ``metodo_pago``, ``canal`` y
+    ``nota`` se ignoran.
     """
 
     body = request.get_json(force=True) or {}
-    campos_permitidos = ["cliente", "metodo_pago"]
-    payload = {k: v for k, v in body.items() if k in campos_permitidos}
+    campos_permitidos = ["cliente", "metodo_pago", "canal", "nota"]
+    payload = {k: v for k, v in body.items() if k in campos_permitidos and v is not None}
 
     if not payload:
         return jsonify({"error": "Nada para actualizar"}), 400
+
+    if "canal" in payload and payload["canal"] not in CANALES_VENTA:
+        return jsonify({"error": "canal debe ser 'local' o 'virtual'"}), 400
 
     conn = get_db()
     cursor = conn.cursor()
@@ -579,15 +605,9 @@ def editar_venta(venta_id):
         conn.close()
         return jsonify({"error": "Venta no encontrada"}), 404
 
-    cliente = payload.get("cliente")
-    metodo_pago = payload.get("metodo_pago")
-
-    if cliente is not None and metodo_pago is not None:
-        cursor.execute("UPDATE ventas SET cliente = ?, metodo_pago = ? WHERE id = ?", (cliente, metodo_pago, venta_id))
-    elif cliente is not None:
-        cursor.execute("UPDATE ventas SET cliente = ? WHERE id = ?", (cliente, venta_id))
-    elif metodo_pago is not None:
-        cursor.execute("UPDATE ventas SET metodo_pago = ? WHERE id = ?", (metodo_pago, venta_id))
+    # Los nombres de columna salen de campos_permitidos, no del body.
+    asignaciones = ", ".join(f"{campo} = ?" for campo in payload)
+    cursor.execute(f"UPDATE ventas SET {asignaciones} WHERE id = ?", (*payload.values(), venta_id))
 
     conn.commit()
     cursor.execute("SELECT * FROM ventas WHERE id = ?", (venta_id,))

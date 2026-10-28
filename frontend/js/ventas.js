@@ -1,8 +1,10 @@
 import { $, apiUrlInput, apiFetch } from './api.js';
 import { money, esc, desformatearMiles, attachFormateoMiles, renderPaginacion, detallePago, parseFechaUTC, formatoFechaHora } from './utils.js';
 import { variantesIndex, cargarIndiceBusqueda } from './productos.js';
+import { botonNota, abrirModalNota } from './nota-modal.js';
 
 let paginaVentas = 1;
+let ventasCache = [];
 export let carrito = [];
 
 
@@ -24,6 +26,7 @@ export async function cargarVentas(page = 1) {
 
   const res = await apiFetch('/api/ventas?' + params.toString());
   const { data, total, page_size } = await res.json();
+  ventasCache = data;
 
   $('#tablaVentas').innerHTML = data.length ? data.map(v => `
     <tr>
@@ -36,18 +39,40 @@ export async function cargarVentas(page = 1) {
       <td>${money(v.ganancia)}</td>
       <td>
         <span class="badge ${esc(v.estado)}">${esc(v.estado)}</span>
+        ${v.canal === 'virtual' ? '<span class="badge virtual">Virtual</span>' : '<span class="badge local">Local</span>'}
         ${v.tiene_cambio ? '<span class="badge cambio">Cambio</span>' : ''}
       </td>
       <td>
         <div class="row-actions">
-          <button class="btn icon small" onclick="abrirEditarVenta('${v.id}', ${esc(JSON.stringify(v.cliente || ''))}, ${esc(JSON.stringify(v.metodo_pago || ''))})">✏️</button>
+          <button class="btn icon small" onclick="abrirEditarVenta('${v.id}', ${esc(JSON.stringify(v.cliente || ''))}, ${esc(JSON.stringify(v.metodo_pago || ''))}, '${v.canal === 'virtual' ? 'virtual' : 'local'}')">✏️</button>
           <button class="btn danger small" onclick="borrarVenta('${v.id}')">🗑</button>
           ${v.estado === 'realizada' ? `<button class="btn danger small" onclick="marcarDevolucion('${v.id}')">Devolución</button>` : ''}
         </div>
+        ${botonNota(v.nota, `abrirNotaVenta('${v.id}')`)}
       </td>
     </tr>`).join('') : '<tr><td colspan="8" class="empty">No hay ventas para este filtro</td></tr>';
 
   renderPaginacion('paginacionVentas', page, page_size, total, 'cargarVentas');
+}
+
+/**
+ * Abre el modal para ver o editar la nota de una venta.
+ *
+ * @param {number|string} id - Identificador de la venta.
+ */
+export function abrirNotaVenta(id) {
+  const v = ventasCache.find(x => String(x.id) === String(id));
+  if (!v) return;
+
+  abrirModalNota(`Nota de la venta ${v.codigo || ''}`, v.nota, async (nota) => {
+    const res = await apiFetch(`/api/ventas/${v.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nota }),
+    });
+    if (res.ok) cargarVentas(paginaVentas);
+    return res;
+  });
 }
 
 export function limpiarFiltroFechaVentas() {
@@ -98,11 +123,13 @@ export async function borrarVenta(ventaId, refrescarTodo) {
  * @param {number|string} id - Identificador de la venta.
  * @param {string} cliente - Nombre del cliente.
  * @param {string} metodo - Método de pago utilizado en la venta.
+ * @param {string} canal - Canal de la venta ('local' o 'virtual').
  */
-export function abrirEditarVenta(id, cliente, metodo) {
+export function abrirEditarVenta(id, cliente, metodo, canal) {
   $('#ventaIdEdit').value = id;
   $('#editCliente').value = cliente || '';
   $('#editMetodoPago').value = metodo;
+  seleccionarCanal('editCanal', canal || 'local');
   $('#msgEditarVenta').textContent = '';
   $('#modalEditarVenta').classList.add('active');
 }
@@ -119,7 +146,11 @@ export function abrirEditarVenta(id, cliente, metodo) {
  */
 export async function guardarEdicionVenta(refrescarDashboard) {
   const id = $('#ventaIdEdit').value;
-  const body = { cliente: $('#editCliente').value, metodo_pago: $('#editMetodoPago').value };
+  const body = {
+    cliente: $('#editCliente').value,
+    metodo_pago: $('#editMetodoPago').value,
+    canal: canalSeleccionado('editCanal'),
+  };
   const res = await apiFetch(`/api/ventas/${id}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
@@ -137,6 +168,30 @@ export async function guardarEdicionVenta(refrescarDashboard) {
 
 
 /**
+ * Marca como activo el botón del canal elegido ('local' o 'virtual')
+ * dentro de un grupo de botones `.canal-toggle`.
+ *
+ * @param {string} id - ID del contenedor de los botones.
+ * @param {string} canal - Canal a seleccionar.
+ */
+export function seleccionarCanal(id, canal) {
+  document.querySelectorAll(`#${id} [data-canal]`).forEach(b =>
+    b.classList.toggle('active', b.dataset.canal === canal));
+}
+
+
+/**
+ * Devuelve el canal seleccionado en un grupo de botones `.canal-toggle`.
+ *
+ * @param {string} id - ID del contenedor de los botones.
+ * @returns {string} 'local' o 'virtual'.
+ */
+function canalSeleccionado(id) {
+  return document.querySelector(`#${id} [data-canal].active`)?.dataset.canal || 'local';
+}
+
+
+/**
  * Abre y reinicia el modal de creación de una venta.
  *
  * Vacía el carrito, limpia los campos del formulario, establece efectivo
@@ -146,10 +201,12 @@ export function abrirModalVenta() {
   carrito = [];
   renderCarrito();
   $('#inputCliente').value = '';
+  $('#inputNotaVenta').value = '';
   $('#buscadorProducto').value = '';
   $('#varianteSeleccionada').value = '';
   $('#msgVenta').textContent = '';
   $('#selectMetodoPago').value = 'efectivo';
+  seleccionarCanal('canalVenta', 'local');
   $('#inputMontoPagado').value = '';
   $('#modalVenta').classList.add('active');
   onCambioMetodoPago();
@@ -253,8 +310,24 @@ export function agregarAlCarrito() {
 
   const v = variantesIndex.find(x => String(x.variante_id) === varianteId);
   const cantidad = parseInt($('#inputCantidad').value) || 1;
+  if (cantidad < 1) { $('#msgVenta').className = 'msg error'; $('#msgVenta').textContent = 'La cantidad tiene que ser al menos 1'; return; }
 
-  carrito.push({ variante_id: v.variante_id, nombre: v.texto, precio: v.precio, cantidad });
+  // Si la prenda ya está en el carrito, se suma a esa línea en vez de agregar otra.
+  const existente = carrito.find(c => c.variante_id === v.variante_id);
+  const yaEnCarrito = existente ? existente.cantidad : 0;
+  if (yaEnCarrito + cantidad > v.stock) {
+    $('#msgVenta').className = 'msg error';
+    $('#msgVenta').textContent = yaEnCarrito
+      ? `Solo hay ${v.stock} unidad(es) en stock y ya tenés ${yaEnCarrito} en el carrito`
+      : `Solo hay ${v.stock} unidad(es) en stock`;
+    return;
+  }
+
+  if (existente) {
+    existente.cantidad += cantidad;
+  } else {
+    carrito.push({ variante_id: v.variante_id, nombre: v.texto, precio: v.precio, cantidad });
+  }
   renderCarrito();
 
   $('#buscadorProducto').value = '';
@@ -314,6 +387,8 @@ export async function confirmarVenta(refrescarTodo) {
   const body = {
     cliente: $('#inputCliente').value || null,
     metodo_pago: metodo,
+    canal: canalSeleccionado('canalVenta'),
+    nota: $('#inputNotaVenta').value,
     items: carrito.map(c => ({ variante_id: c.variante_id, cantidad: c.cantidad }))
   };
 

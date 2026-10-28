@@ -11,6 +11,11 @@ from app.routes.dashboard import dashboard_bp
 from app.routes.backup import backup_bp
 from app.routes.cambios import cambios_bp
 from app.routes.update import update_bp
+from app.routes.configuracion import configuracion_bp
+from app.routes.exportar import exportar_bp
+from app.routes.estadisticas import estadisticas_bp
+from app.routes.notas import notas_bp
+from app.routes.envios import envios_bp
 
 
 def _frontend_dir() -> str:
@@ -31,6 +36,8 @@ def create_app():
     # Inicializa la base de datos SQLite local al arrancar la aplicación
     init_db()
     app.teardown_appcontext(cerrar_conexiones)
+    # Tope para archivos subidos (restaurar un respaldo).
+    app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024
 
     app.register_blueprint(productos_bp)
     app.register_blueprint(ventas_bp)
@@ -39,6 +46,11 @@ def create_app():
     app.register_blueprint(backup_bp)
     app.register_blueprint(cambios_bp)
     app.register_blueprint(update_bp)
+    app.register_blueprint(configuracion_bp)
+    app.register_blueprint(exportar_bp)
+    app.register_blueprint(estadisticas_bp)
+    app.register_blueprint(notas_bp)
+    app.register_blueprint(envios_bp)
 
     @app.get("/")
     def index():

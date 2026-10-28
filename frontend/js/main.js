@@ -1,14 +1,15 @@
 import { $, apiUrlInput } from './api.js';
 import {
   cargarDashboard, cargarHistorialDia,
-  abrirResumenCaja, copiarResumenCaja, exportarResumenCajaPDF
+  abrirResumenCaja, copiarResumenCaja, exportarResumenCajaPDF,
+  abrirVentasUltimosMeses, copiarVentasUltimosMeses
 } from './dashboard.js'
 import {
   cargarCambios, limpiarFiltroFechaCambios, borrarCambio,
   abrirModalCambio, cambiarVentaSeleccionada, initBuscadorVentaCambio,
   initBuscadorProductoNuevoCambio, agregarProductoNuevoCambio,
   quitarProductoNuevoCambio, actualizarResumenCambio, onEditarMontoDiferencia,
-  corregirCantidadDevolver, confirmarCambio, editarCambio
+  corregirCantidadDevolver, confirmarCambio, editarCambio, abrirNotaCambio
 } from './cambios.js';
 import {
   cargarProductos, cargarIndiceBusqueda, cargarTipos,
@@ -16,19 +17,31 @@ import {
   abrirModalProducto, agregarFilaVariante, initFormProducto,
   buscarProductosLista, guardarVarianteExistente, guardarVarianteNueva,
   borrarVarianteDesdeModal, cargarProductosSinStock, buscarProductosSinStock,
-  toggleProductosSinStock
+  toggleProductosSinStock, abrirNotaProducto
 } from './productos.js';
+import { guardarModalNota } from './nota-modal.js';
 import {
   cargarVentas, limpiarFiltroFechaVentas, marcarDevolucion, borrarVenta,
   abrirEditarVenta, guardarEdicionVenta, abrirModalVenta, onCambioMetodoPago,
   calcularVuelto, initBuscadorProducto, agregarAlCarrito, quitarDelCarrito,
-  confirmarVenta
+  confirmarVenta, seleccionarCanal, abrirNotaVenta
 } from './ventas.js';
 import {
   cargarTiposConfig, editarTipo, borrarTipo,
-  initFormTipo, subirBackupSupabase
+  initFormTipo, subirBackupSupabase,
+  cargarUmbralStockBajo, initFormStockBajo,
+  restaurarDesdeArchivo, initExportar, exportarVentasCSV, exportarStockCSV
 } from './config.js';
 import { hoyISO } from './utils.js';
+import { cargarEstadisticas } from './estadisticas.js';
+import {
+  cargarEnvios, initEnvios, abrirModalEnvio, avanzarEnvio, borrarEnvio,
+  copiarSeguimiento, quitarVentaEnvio, mostrarMasCerrados
+} from './envios.js';
+import {
+  cargarNotas, initNotas, toggleNota, editarNota, guardarEdicionNota,
+  cancelarEdicionNota, borrarNota
+} from './notas.js';
 
 
 /**
@@ -103,6 +116,7 @@ function cargarTodo() {
   cargarTipos();
   cargarIndiceBusqueda();
   cargarTiposConfig();
+  cargarUmbralStockBajo();
 }
 
 
@@ -119,7 +133,10 @@ document.querySelectorAll('nav button[data-tab]').forEach(btn => {
     if (btn.dataset.tab === 'productos') cargarProductos();
     if (btn.dataset.tab === 'ventas') cargarVentas();
     if (btn.dataset.tab === 'cambios') cargarCambios();
-    if (btn.dataset.tab === 'configuracion') { cargarTiposConfig(); }
+    if (btn.dataset.tab === 'configuracion') { cargarTiposConfig(); cargarUmbralStockBajo(); }
+    if (btn.dataset.tab === 'estadisticas') cargarEstadisticas();
+    if (btn.dataset.tab === 'envios') cargarEnvios();
+    if (btn.dataset.tab === 'notas') cargarNotas();
   });
 });
 
@@ -146,6 +163,10 @@ $('#buscadorProductosSinStock').addEventListener('input', (e) => {
 
 initFormProducto(refrescarTrasProducto);
 initFormTipo();
+initFormStockBajo(cargarDashboard);
+initExportar();
+initEnvios();
+initNotas();
 initBuscadorProducto();
 initBuscadorVentaCambio();
 initBuscadorProductoNuevoCambio();
@@ -161,6 +182,8 @@ Object.assign(window, {
   abrirResumenCaja,
   copiarResumenCaja,
   exportarResumenCajaPDF,
+  abrirVentasUltimosMeses,
+  copiarVentasUltimosMeses,
 
   // cambios
   cargarCambios,
@@ -169,6 +192,7 @@ Object.assign(window, {
   abrirModalCambio,
   cambiarVentaSeleccionada,
   editarCambio,
+  abrirNotaCambio,
   agregarProductoNuevoCambio,
   quitarProductoNuevoCambio,
   actualizarResumenCambio,
@@ -186,6 +210,8 @@ Object.assign(window, {
   guardarVarianteNueva: (btn) => guardarVarianteNueva(btn, refrescarTrasProducto),
   borrarVarianteDesdeModal: (btn) => borrarVarianteDesdeModal(btn, refrescarTrasProducto),
   toggleProductosSinStock,
+  abrirNotaProducto,
+  guardarModalNota,
 
   // ventas / carrito
   abrirModalVenta,
@@ -198,12 +224,32 @@ Object.assign(window, {
   marcarDevolucion: (id) => marcarDevolucion(id, refrescarTrasVenta),
   borrarVenta: (id) => borrarVenta(id, refrescarTrasVenta),
   abrirEditarVenta,
+  seleccionarCanal,
+  abrirNotaVenta,
   guardarEdicionVenta: () => guardarEdicionVenta(cargarDashboard),
 
   // configuración / tipos
   editarTipo,
   borrarTipo,
   subirBackupSupabase,
+  restaurarDesdeArchivo,
+  exportarVentasCSV,
+  exportarStockCSV,
+
+  // envíos
+  abrirModalEnvio,
+  avanzarEnvio,
+  borrarEnvio,
+  copiarSeguimiento,
+  quitarVentaEnvio,
+  mostrarMasCerrados,
+
+  // notas
+  toggleNota,
+  editarNota,
+  guardarEdicionNota,
+  cancelarEdicionNota,
+  borrarNota,
 });
 
 cargarTodo();

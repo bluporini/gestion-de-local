@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app.database import get_db
+from app.routes.configuracion import leer_umbral_stock_bajo
 
 productos_bp = Blueprint("productos", __name__, url_prefix="/api/productos")
 
@@ -290,7 +291,7 @@ def stock_bajo():
     -----
     El rango considerado como stock bajo es:
 
-    ``0 < stock_actual < 5``
+    ``0 < stock_actual <= umbral`` (umbral configurable, ver routes/configuracion.py)
 
     El umbral de 5 unidades es exclusivo: una variante con exactamente
     5 unidades no se considera con stock bajo.
@@ -302,8 +303,8 @@ def stock_bajo():
         SELECT vp.*, p.nombre as producto_nombre 
         FROM variantes_producto vp
         JOIN productos p ON vp.producto_id = p.id
-        WHERE vp.stock_actual > 0 AND vp.stock_actual < 5
-    """)
+        WHERE vp.stock_actual > 0 AND vp.stock_actual <= ?
+    """, (leer_umbral_stock_bajo(cursor),))
     rows = cursor.fetchall()
 
     conn.close()
@@ -394,6 +395,8 @@ def crear_producto():
         producto y, si corresponde, generar su código.
     descripcion : str, optional
         Descripción del producto. Por defecto, ``""``.
+    nota : str, optional
+        Observación libre sobre el producto. Por defecto, ``""``.
     codigo : str, optional
         Código del producto. Si no se proporciona, se genera
         automáticamente mediante ``_generar_codigo_producto()``.
@@ -427,6 +430,7 @@ def crear_producto():
         return jsonify({"error": "nombre es requerido"}), 400
     tipo_id = body.get("tipo_id")
     descripcion = body.get("descripcion", "")
+    nota = body.get("nota") or ""
 
     conn = get_db()
     cursor = conn.cursor()
@@ -436,9 +440,9 @@ def crear_producto():
         codigo_base = _generar_codigo_producto(cursor, tipo_id)
 
     cursor.execute("""
-        INSERT INTO productos (codigo, nombre, tipo_id, stock_actual, descripcion, activo)
-        VALUES (?, ?, ?, 0, ?, 1)
-    """, (codigo_base, nombre, tipo_id, descripcion))
+        INSERT INTO productos (codigo, nombre, tipo_id, stock_actual, descripcion, activo, nota)
+        VALUES (?, ?, ?, 0, ?, 1, ?)
+    """, (codigo_base, nombre, tipo_id, descripcion, nota))
     producto_id = cursor.lastrowid
 
 
@@ -722,6 +726,9 @@ def actualizar_producto(producto_id):
     activo : bool, optional
         Indica si el producto está activo. Si no se proporciona, se
         conserva el valor actual.
+    nota : str, optional
+        Observación libre sobre el producto. Si no se proporciona, se
+        conserva el valor actual.
 
     Returns
     -------
@@ -750,11 +757,12 @@ def actualizar_producto(producto_id):
     descripcion = body.get("descripcion", actual["descripcion"])
     tipo_id = body.get("tipo_id", actual["tipo_id"])
     activo = body.get("activo", actual["activo"])
+    nota = body.get("nota", actual["nota"]) or ""
     cursor.execute("""
         UPDATE productos 
-        SET nombre = ?, descripcion = ?, tipo_id = ?, activo = ?
+        SET nombre = ?, descripcion = ?, tipo_id = ?, activo = ?, nota = ?
         WHERE id = ?
-    """, (nombre, descripcion, tipo_id, activo, producto_id))
+    """, (nombre, descripcion, tipo_id, activo, nota, producto_id))
     conn.commit()
     cursor.execute("SELECT * FROM productos WHERE id = ?", (producto_id,))
     updated = _serializar_producto(dict(cursor.fetchone()))

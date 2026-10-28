@@ -1,7 +1,8 @@
 import os
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from app.supabase_backup import hacer_backup_ahora
+from app.restaurar import RespaldoInvalido, restaurar_desde_archivo
 
 backup_bp = Blueprint("backup", __name__, url_prefix="/api")
 
@@ -63,3 +64,40 @@ def subir_backup_supabase():
             "No se pudo realizar el respaldo."
         )
     }), 500
+
+
+@backup_bp.route("/backup/restaurar", methods=["POST"])
+def restaurar_backup():
+    """Reemplaza la base local por la de un archivo de respaldo.
+
+    Recibe el archivo en el campo ``archivo`` (multipart/form-data): un
+    ``.db.gz`` descargado de Supabase o un ``.db``. Antes de reemplazar,
+    guarda una copia de la base actual en ``restauraciones/``.
+
+    Returns
+    -------
+    flask.Response
+        ``ok=True`` y el nombre de la copia de la base anterior. HTTP 400
+        si no se envió archivo o no es un respaldo válido (la base actual
+        no se toca). HTTP 403 en la demo web.
+    """
+    if os.environ.get("DEMO"):
+        return jsonify({
+            "ok": False,
+            "message": "Restaurar respaldos está deshabilitado en la demo."
+        }), 403
+
+    archivo = request.files.get("archivo")
+    if not archivo or not archivo.filename:
+        return jsonify({"ok": False, "message": "No se eligió ningún archivo."}), 400
+
+    try:
+        copia = restaurar_desde_archivo(archivo)
+    except RespaldoInvalido as e:
+        return jsonify({"ok": False, "message": str(e)}), 400
+
+    return jsonify({
+        "ok": True,
+        "message": "¡Respaldo restaurado correctamente!",
+        "copia_anterior": os.path.basename(copia),
+    })

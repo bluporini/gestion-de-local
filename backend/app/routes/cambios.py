@@ -752,3 +752,27 @@ def actualizar_cambio(cambio_id):
     actualizado = dict(cursor.fetchone())
     conn.close()
     return jsonify(actualizado)
+
+
+@cambios_bp.patch("/<int:cambio_id>/observaciones")
+def actualizar_observaciones_cambio(cambio_id):
+    """Edita solo las observaciones (la nota) de un cambio.
+
+    A diferencia de ``PATCH /<id>``, no revierte ni vuelve a aplicar el
+    cambio: no toca stock, ítems ni totales.
+    """
+    body = request.get_json(force=True) or {}
+    observaciones = body.get("observaciones") or ""
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE cambios SET observaciones = ? WHERE id = ?", (observaciones, cambio_id))
+    if cursor.rowcount == 0:
+        conn.close()
+        return jsonify({"error": "Cambio no encontrado"}), 404
+
+    conn.commit()
+    cursor.execute("SELECT * FROM cambios WHERE id = ?", (cambio_id,))
+    actualizado = dict(cursor.fetchone())
+    conn.close()
+    return jsonify(actualizado)

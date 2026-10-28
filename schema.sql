@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS productos (
     porcentaje_ganancia REAL DEFAULT 30,
     stock_actual INTEGER DEFAULT 0,
     activo INTEGER DEFAULT 1,
+    nota TEXT DEFAULT '',
     FOREIGN KEY (tipo_id) REFERENCES tipos_prenda(id) ON DELETE SET NULL
 );
 
@@ -81,7 +82,9 @@ CREATE TABLE IF NOT EXISTS ventas (
     estado TEXT DEFAULT 'realizada',
     tiene_cambio INTEGER DEFAULT 0,
     total_base REAL DEFAULT 0,
-    ganancia_base REAL DEFAULT 0
+    ganancia_base REAL DEFAULT 0,
+    canal TEXT NOT NULL DEFAULT 'local',
+    nota TEXT DEFAULT ''
 );
 
 
@@ -140,6 +143,50 @@ CREATE TABLE IF NOT EXISTS cambio_items (
     costo_unitario REAL NOT NULL DEFAULT 0,
     FOREIGN KEY (cambio_id) REFERENCES cambios(id) ON DELETE CASCADE,
     FOREIGN KEY (variante_id) REFERENCES variantes_producto(id)
+);
+
+-- Notas personales: una lista de notas fechadas, con etiquetas opcionales.
+CREATE TABLE IF NOT EXISTS notas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    texto TEXT NOT NULL,
+    hecha INTEGER NOT NULL DEFAULT 0,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS etiquetas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE COLLATE NOCASE
+);
+
+CREATE TABLE IF NOT EXISTS nota_etiquetas (
+    nota_id INTEGER NOT NULL,
+    etiqueta_id INTEGER NOT NULL,
+    PRIMARY KEY (nota_id, etiqueta_id),
+    FOREIGN KEY (nota_id) REFERENCES notas(id) ON DELETE CASCADE,
+    FOREIGN KEY (etiqueta_id) REFERENCES etiquetas(id) ON DELETE CASCADE
+);
+
+
+-- Envíos (Correo Argentino, Andreani, etc.). Solo registro: el costo no
+-- afecta la caja ni la ganancia. Se pueden vincular a una venta.
+CREATE TABLE IF NOT EXISTS envios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,                       -- fecha local, YYYY-MM-DD
+    empresa TEXT NOT NULL,
+    numero_seguimiento TEXT,
+    destinatario TEXT NOT NULL,
+    telefono TEXT,
+    direccion TEXT,
+    localidad TEXT,
+    provincia TEXT,
+    codigo_postal TEXT,
+    costo REAL NOT NULL DEFAULT 0,
+    paga TEXT NOT NULL DEFAULT 'cliente',      -- 'cliente' | 'local'
+    estado TEXT NOT NULL DEFAULT 'por_preparar', -- por_preparar | despachado | entregado | problema | resuelto
+    observaciones TEXT,
+    venta_id INTEGER,
+    creado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL
 );
 
 -- Configuración inicial

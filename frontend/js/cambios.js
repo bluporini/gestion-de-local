@@ -1,6 +1,7 @@
 import { $, apiUrlInput, apiFetch } from './api.js';
 import { money, esc, desformatearMiles, attachFormateoMiles, renderPaginacion, parseFechaUTC, formatoFechaHora } from './utils.js';
 import { variantesIndex } from './productos.js';
+import { botonNota, abrirModalNota } from './nota-modal.js';
 
 const NOMBRES_METODO_PAGO = {
     efectivo: 'Efectivo',
@@ -11,8 +12,30 @@ const NOMBRES_METODO_PAGO = {
 };
 
 let paginaCambios = 1;
+let cambiosCache = [];
 
 // ---------- Listado ----------
+
+/**
+ * Abre el modal para ver o editar la nota (observaciones) de un cambio.
+ * Usa un endpoint aparte que no rehace el cambio ni toca el stock.
+ *
+ * @param {number|string} id - Identificador del cambio.
+ */
+export function abrirNotaCambio(id) {
+    const c = cambiosCache.find(x => String(x.id) === String(id));
+    if (!c) return;
+
+    abrirModalNota(`Nota del cambio ${c.codigo || ''}`, c.observaciones, async (observaciones) => {
+        const res = await apiFetch(`/api/cambios/${c.id}/observaciones`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ observaciones }),
+        });
+        if (res.ok) cargarCambios(paginaCambios);
+        return res;
+    });
+}
 
 /**
  * Carga y muestra el listado paginado de cambios.
@@ -32,6 +55,7 @@ export async function cargarCambios(page = 1) {
 
     const res = await apiFetch('/api/cambios?' + params.toString());
     const { data, total, page_size } = await res.json();
+    cambiosCache = data;
 
     $('#tablaCambios').innerHTML = data.length ? data.map(c => {
         const devueltos = c.items.filter(i => i.tipo === 'devuelto');
@@ -73,6 +97,7 @@ export async function cargarCambios(page = 1) {
             <button class="btn icon small" onclick="editarCambio('${c.id}')" title="Editar">✏️</button>
             <button class="btn danger small" onclick="borrarCambio('${c.id}')" title="Borrar">🗑</button>
           </div>
+          ${botonNota(c.observaciones, `abrirNotaCambio('${c.id}')`)}
         </td>
       </tr>`;
     }).join('') : '<tr><td colspan="9" class="empty">No hay cambios para este filtro</td></tr>';
@@ -144,6 +169,10 @@ let ventaSeleccionada = null;
 let itemsDisponibles = [];
 let itemsNuevos = [];
 let cambioEditandoId = null;
+// Al editar un cambio, unidades que ese cambio ya había sacado del stock,
+// por variante. El backend las repone antes de validar, así que cuentan
+// como disponibles para este mismo cambio.
+let reservadoPorEsteCambio = {};
 
 /**
  * Abre y reinicia el modal para registrar un nuevo cambio.
@@ -158,6 +187,7 @@ export function abrirModalCambio() {
     itemsDisponibles = [];
     itemsNuevos = [];
     cambioEditandoId = null;
+    reservadoPorEsteCambio = {};
 
     $('#buscadorVentaCambio').value = '';
     $('#buscadorResultadosVentaCambio').classList.remove('active');
@@ -390,14 +420,29 @@ export function agregarProductoNuevoCambio() {
 
     const v = variantesIndex.find(x => String(x.variante_id) === varianteId);
     const cantidad = parseInt($('#inputCantidadNuevoCambio').value) || 1;
-
-    if (cantidad > v.stock) {
+    if (cantidad < 1) {
         $('#msgCambio').className = 'msg error';
-        $('#msgCambio').textContent = `Solo hay ${v.stock} unidad(es) en stock`;
+        $('#msgCambio').textContent = 'La cantidad tiene que ser al menos 1';
         return;
     }
 
-    itemsNuevos.push({ variante_id: v.variante_id, texto: v.texto, precio: v.precio, cantidad });
+    // Si la prenda ya está en la lista, se suma a esa línea en vez de agregar otra.
+    const existente = itemsNuevos.find(c => c.variante_id === v.variante_id);
+    const yaAgregado = existente ? existente.cantidad : 0;
+    const disponible = v.stock + (reservadoPorEsteCambio[v.variante_id] || 0);
+    if (yaAgregado + cantidad > disponible) {
+        $('#msgCambio').className = 'msg error';
+        $('#msgCambio').textContent = yaAgregado
+            ? `Solo hay ${disponible} unidad(es) disponibles y ya agregaste ${yaAgregado}`
+            : `Solo hay ${disponible} unidad(es) disponibles`;
+        return;
+    }
+
+    if (existente) {
+        existente.cantidad += cantidad;
+    } else {
+        itemsNuevos.push({ variante_id: v.variante_id, texto: v.texto, precio: v.precio, cantidad });
+    }
     renderListaNuevos();
     actualizarResumenCambio();
 
@@ -530,6 +575,10 @@ export async function editarCambio(cambioId) {
     });
 
     const nuevosDeEsteCambio = cambio.items.filter(i => i.tipo === 'nuevo');
+    reservadoPorEsteCambio = {};
+    nuevosDeEsteCambio.forEach(i => {
+        reservadoPorEsteCambio[i.variante_id] = (reservadoPorEsteCambio[i.variante_id] || 0) + i.cantidad;
+    });
     itemsNuevos = nuevosDeEsteCambio.map(i => ({
         variante_id: i.variante_id,
         texto: `${i.producto_nombre} — ${i.var_codigo} (${i.talle || ''}/${i.color || ''})`,

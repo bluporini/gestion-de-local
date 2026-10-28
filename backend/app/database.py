@@ -261,6 +261,69 @@ def _migrar_totales_base_ventas(conn):
         conn.commit()
 
 
+def _migrar_canal_ventas(conn):
+    """
+    Agrega la columna canal ('local' o 'virtual') a ventas si no existe.
+    Las ventas anteriores quedan como 'local' por el DEFAULT.
+    """
+    if "canal" not in _columnas(conn, "ventas"):
+        conn.execute("ALTER TABLE ventas ADD COLUMN canal TEXT NOT NULL DEFAULT 'local'")
+        conn.commit()
+
+
+def _migrar_nota_productos(conn):
+    """Agrega la columna nota (texto libre) a productos si no existe."""
+    if "nota" not in _columnas(conn, "productos"):
+        conn.execute("ALTER TABLE productos ADD COLUMN nota TEXT DEFAULT ''")
+        conn.commit()
+
+
+def _migrar_nota_ventas(conn):
+    """Agrega la columna nota (texto libre) a ventas si no existe."""
+    if "nota" not in _columnas(conn, "ventas"):
+        conn.execute("ALTER TABLE ventas ADD COLUMN nota TEXT DEFAULT ''")
+        conn.commit()
+
+
+def _migrar_notas_sin_bloques(conn):
+    """
+    Las primeras notas (solo en desarrollo, nunca publicadas) estaban
+    agrupadas en bloques (notas_bloques + notas.bloque_id). Ahora son una
+    lista con etiquetas: si encuentra el formato viejo, recrea la tabla
+    `notas` sin bloque_id y convierte el nombre de cada bloque en la
+    etiqueta de sus notas.
+    """
+    if "bloque_id" not in _columnas(conn, "notas"):
+        return
+
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute("""
+        CREATE TABLE notas_nueva (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            texto TEXT NOT NULL,
+            hecha INTEGER NOT NULL DEFAULT 0,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("INSERT INTO notas_nueva (id, texto, hecha, fecha) SELECT id, texto, hecha, fecha FROM notas")
+    conn.execute("""
+        INSERT OR IGNORE INTO etiquetas (nombre)
+        SELECT DISTINCT b.nombre FROM notas_bloques b JOIN notas n ON n.bloque_id = b.id
+    """)
+    conn.execute("""
+        INSERT OR IGNORE INTO nota_etiquetas (nota_id, etiqueta_id)
+        SELECT n.id, e.id
+        FROM notas n
+        JOIN notas_bloques b ON n.bloque_id = b.id
+        JOIN etiquetas e ON e.nombre = b.nombre
+    """)
+    conn.execute("DROP TABLE notas")
+    conn.execute("ALTER TABLE notas_nueva RENAME TO notas")
+    conn.execute("DROP TABLE IF EXISTS notas_bloques")
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+
 def _sincronizar_stock_productos(conn):
     """
     Recalcula productos.stock_actual como la suma de sus variantes.
@@ -291,6 +354,10 @@ def init_db():
     _migrar_codigo_ventas(conn)
     _migrar_tabla_cambios(conn)
     _migrar_totales_base_ventas(conn)
+    _migrar_canal_ventas(conn)
+    _migrar_nota_productos(conn)
+    _migrar_nota_ventas(conn)
     _sincronizar_stock_productos(conn)
+    _migrar_notas_sin_bloques(conn)
 
     conn.close()

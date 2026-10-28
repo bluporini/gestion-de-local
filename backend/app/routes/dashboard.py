@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, jsonify, request
 from app.database import get_db
+from app.routes.configuracion import leer_umbral_stock_bajo
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/api/dashboard")
 
@@ -76,7 +77,7 @@ def resumen():
 
         ``productos_stock_bajo``
             Lista de variantes cuyo stock actual es mayor que 0 y menor
-            que 5 unidades.
+            o igual al umbral configurado (``stock_bajo_umbral``).
 
     Notes
     -----
@@ -192,14 +193,15 @@ def resumen():
     ingresos_hoy = sum(v.get("total_base", v.get("total", 0)) for v in ventas_hoy) \
         + sum(c.get("monto_diferencia", 0) for c in cambios_hoy)
 
-    # Obtener productos con stock bajo: más de 0 pero menos de 2 unidades
+    # Variantes con stock bajo: más de 0 y hasta el umbral configurado
     # (si está en 0 no es "stock bajo", es "sin stock")
+    umbral = leer_umbral_stock_bajo(cursor)
     cursor.execute("""
         SELECT vp.*, p.nombre as producto_nombre 
         FROM variantes_producto vp
         JOIN productos p ON vp.producto_id = p.id
-        WHERE vp.stock_actual > 0 AND vp.stock_actual < 2
-    """)
+        WHERE vp.stock_actual > 0 AND vp.stock_actual <= ?
+    """, (umbral,))
     stock_bajo_rows = [dict(row) for row in cursor.fetchall()]
 
     conn.close()

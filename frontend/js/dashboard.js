@@ -141,16 +141,73 @@ export async function abrirResumenCaja() {
   $('#modalResumenCaja').classList.add('active');
 }
 
-export async function copiarResumenCaja() {
-  const texto = $('#textoResumenCaja').value;
+async function copiarTexto(idTexto, idMsg) {
   try {
-    await navigator.clipboard.writeText(texto);
-    $('#msgResumenCaja').className = 'msg ok';
-    $('#msgResumenCaja').textContent = 'Copiado al portapapeles ✅';
+    await navigator.clipboard.writeText($('#' + idTexto).value);
+    $('#' + idMsg).className = 'msg ok';
+    $('#' + idMsg).textContent = 'Copiado al portapapeles ✅';
   } catch (e) {
-    $('#msgResumenCaja').className = 'msg error';
-    $('#msgResumenCaja').textContent = 'No se pudo copiar (probá seleccionar el texto manualmente)';
+    $('#' + idMsg).className = 'msg error';
+    $('#' + idMsg).textContent = 'No se pudo copiar (probá seleccionar el texto manualmente)';
   }
+}
+
+export function copiarResumenCaja() {
+  return copiarTexto('textoResumenCaja', 'msgResumenCaja');
+}
+
+export function copiarVentasUltimosMeses() {
+  return copiarTexto('textoVentasMeses', 'msgVentasMeses');
+}
+
+const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+  'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+/**
+ * Arma el texto plano con el monto vendido en cada uno de los meses recibidos.
+ *
+ * Los montos salen de /api/estadisticas/mensual, que usa las mismas reglas
+ * que las tarjetas del dashboard (ventas realizadas + cambios del mes).
+ *
+ * @param {Array<Object>} meses - Meses a mostrar, del más viejo al actual.
+ * @returns {string} Texto para el block de notas.
+ */
+function generarTextoVentasMeses(meses) {
+  const cantidad = n => `${n} venta${n === 1 ? '' : 's'}`;
+  const ultimo = meses.length - 1;
+
+  const lineas = meses.map((m, i) => {
+    const [anio, mes] = m.mes.split('-').map(Number);
+    const nombre = `${NOMBRES_MES[mes - 1]} ${anio}${i === ultimo ? ' (en curso)' : ''}`;
+    return [
+      `${nombre.padEnd(30, ' ')}= ${money(m.ingresos)}`,
+      `    ${cantidad(m.ventas)} (local: ${m.ventas_local} · virtual: ${m.ventas_virtual})`,
+    ].join('\n');
+  });
+
+  const total = meses.reduce((suma, m) => suma + m.ingresos, 0);
+  const ventas = meses.reduce((suma, m) => suma + m.ventas, 0);
+
+  return [
+    `Ventas de los últimos ${meses.length} meses`,
+    `Generado: ${new Date().toLocaleDateString('es-AR')}`,
+    '',
+    ...lineas,
+    '----',
+    `${`Total ${meses.length} meses`.padEnd(30, ' ')}= ${money(total)}`,
+    `    ${cantidad(ventas)}`,
+  ].join('\n');
+}
+
+export async function abrirVentasUltimosMeses() {
+  if (!apiUrlInput.value) return;
+  const res = await apiFetch('/api/estadisticas/mensual');
+  if (!res.ok) return;
+  const { meses } = await res.json();
+
+  $('#textoVentasMeses').value = generarTextoVentasMeses(meses.slice(-3));
+  $('#msgVentasMeses').textContent = '';
+  $('#modalVentasMeses').classList.add('active');
 }
 
 export function exportarResumenCajaPDF() {

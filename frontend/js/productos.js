@@ -1,5 +1,6 @@
 import { $, apiUrlInput, apiFetch } from './api.js';
 import { money, esc, renderPaginacion } from './utils.js';
+import { botonNota, abrirModalNota } from './nota-modal.js';
 
 export let productosCache = [];
 export let variantesIndex = []; // lista plana para el buscador de venta: { variante_id, texto, precio, stock }
@@ -94,6 +95,7 @@ export async function cargarProductos(page = 1) {
                 🗑
               </button>
             </div>
+            ${botonNota(p.nota, `abrirNotaProducto('${p.id}')`)}
           </td>
         </tr>
       `).join('')
@@ -167,6 +169,7 @@ export async function cargarProductosSinStock(page = 1) {
           <button class="btn icon small" onclick="editarProducto('${p.id}')">✏️ Editar</button>
           <button class="btn danger small" onclick="borrarProducto('${p.id}')">🗑 Borrar</button>
         </div>
+        ${botonNota(p.nota, `abrirNotaProducto('${p.id}')`)}
       </td>
     </tr>`).join('') : '<tr><td colspan="5" class="empty">No hay productos sin stock</td></tr>';
 
@@ -293,11 +296,40 @@ export function editarProducto(id) {
 
   form.nombre.value = p.nombre;
   form.tipo_id.value = p.tipo_id || '';
+  form.nota.value = p.nota || '';
 
   renderVariantesEdicion(p.variantes_producto || []);
 
   $('#msgProducto').textContent = '';
   $('#modalProducto').classList.add('active');
+}
+
+
+/**
+ * Abre el modal para ver o editar la nota de un producto.
+ *
+ * @param {number|string} id - Identificador del producto.
+ */
+export function abrirNotaProducto(id) {
+  const p =
+    productosCache.find(x => String(x.id) === String(id)) ||
+    productosSinStockCache.find(x => String(x.id) === String(id));
+
+  if (!p) return;
+
+  abrirModalNota(`Nota: ${p.nombre}`, p.nota, async (nota) => {
+    const res = await apiFetch(`/api/productos/${p.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nota }),
+    });
+    if (res.ok) {
+      // Refresca sin volver a la página 1.
+      cargarProductos(paginaProductos);
+      if ($('#panelSinStock').classList.contains('active')) cargarProductosSinStock(paginaProductosSinStock);
+    }
+    return res;
+  });
 }
 
 
